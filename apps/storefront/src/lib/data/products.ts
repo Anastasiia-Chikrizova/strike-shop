@@ -14,6 +14,24 @@ type ProductListQueryParams = (HttpTypes.FindParams &
   option_value_id?: string | string[]
 }
 
+/**
+ * Скільки секунд список товарів живе в кеші Next.
+ *
+ * Без цього вікна `force-cache` тримає відповідь вічно й скидається лише
+ * за тегом, а тег скидають тільки дії у самому сторефронті. Через це
+ * товар, доданий в адмінці, не з'являвся в магазині до перезапуску.
+ */
+const PRODUCTS_REVALIDATE_SECONDS = toPositiveInt(
+  process.env.PRODUCTS_REVALIDATE_SECONDS,
+  60
+)
+
+function toPositiveInt(value: string | undefined, fallback: number): number {
+  const parsed = Number(value)
+
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback
+}
+
 export const listProducts = async ({
   pageParam = 1,
   queryParams,
@@ -58,6 +76,7 @@ export const listProducts = async ({
 
   const next = {
     ...(await getCacheOptions("products")),
+    revalidate: PRODUCTS_REVALIDATE_SECONDS,
   }
 
   return sdk.client
