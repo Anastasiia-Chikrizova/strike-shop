@@ -116,6 +116,17 @@ export async function middleware(request: NextRequest) {
   const firstPathSegment = request.nextUrl.pathname.split("/")[1]?.toLowerCase()
   const urlHasCountry = firstPathSegment === country.toLowerCase()
 
+  // the store listing is the default landing page
+  const isCountryRoot =
+    urlHasCountry && request.nextUrl.pathname.replace(/\/+$/, "") === `/${firstPathSegment}`
+
+  if (request.nextUrl.pathname === "/" || isCountryRoot) {
+    return NextResponse.redirect(
+      `${request.nextUrl.origin}/${country}/store${request.nextUrl.search || ""}`,
+      307
+    )
+  }
+
   if (urlHasCountry) {
     if (!cacheIdCookie) {
       const response = NextResponse.next()

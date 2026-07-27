@@ -12,5 +12,28 @@ module.exports = defineConfig({
       jwtSecret: process.env.JWT_SECRET,
       cookieSecret: process.env.COOKIE_SECRET,
     }
-  }
+  },
+  modules: [
+    { resolve: './src/modules/monobank' },
+    {
+      resolve: '@medusajs/medusa/payment',
+      options: {
+        providers: [
+          {
+            // Ідентифікатор провайдера в Medusa: pp_monobank_monobank
+            resolve: './src/modules/monobank-payment',
+            id: 'monobank',
+            options: {
+              apiKey: process.env.MONO_KEY,
+              apiUrl: process.env.MONO_API_URL,
+              // "debit" — кошти списуються одразу, "hold" — блокуються до capture
+              paymentType: process.env.MONO_PAYMENT_TYPE ?? 'debit',
+              redirectUrl: process.env.MONO_REDIRECT_URL,
+              webhookUrl: process.env.MONO_WEBHOOK_URL,
+            },
+          },
+        ],
+      },
+    },
+  ]
 })

@@ -3,7 +3,6 @@ import { listCartPaymentMethods } from "@lib/data/payment"
 import { HttpTypes } from "@medusajs/types"
 import Addresses from "@modules/checkout/components/addresses"
 import Payment from "@modules/checkout/components/payment"
-import Review from "@modules/checkout/components/review"
 import Shipping from "@modules/checkout/components/shipping"
 
 export default async function CheckoutForm({
@@ -30,9 +29,11 @@ export default async function CheckoutForm({
 
       <Shipping cart={cart} availableShippingMethods={shippingMethods} />
 
+      {/*
+        Кроку Review більше немає: оплата через monobank і є фінальною дією,
+        а замовлення оформлюється автоматично після підтвердження банком.
+      */}
       <Payment cart={cart} availablePaymentMethods={paymentMethods} />
-
-      <Review cart={cart} />
     </div>
   )
 }
