@@ -1,0 +1,89 @@
+name: strike-shop-local
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${LOCAL_DB_USER:-medusa}
+      POSTGRES_DB: ${LOCAL_DB_NAME:-medusa-strike-shop}
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - '127.0.0.1:5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${LOCAL_DB_USER:-medusa}']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ['redis-server', '--appendonly', 'yes']
+    ports:
+      - '127.0.0.1:6379:6379'
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  backend:
+    image: node:22-alpine
+    working_dir: /repo
+    environment:
+      DATABASE_URL: postgres://${LOCAL_DB_USER:-medusa}@postgres:5432/${LOCAL_DB_NAME:-medusa-strike-shop}
+      REDIS_URL: redis://redis:6379
+      STORE_CORS: http://localhost:8000
+      ADMIN_CORS: http://localhost:5173,http://localhost:9000
+      AUTH_CORS: http://localhost:5173,http://localhost:9000,http://localhost:8000
+      JWT_SECRET: ${JWT_SECRET:-local_dev_jwt}
+      COOKIE_SECRET: ${COOKIE_SECRET:-local_dev_cookie}
+    volumes:
+      - .:/repo
+      - backend_root_modules:/repo/node_modules
+      - backend_app_modules:/repo/apps/backend/node_modules
+    ports:
+      - '127.0.0.1:9000:9000'
+    command: >
+      sh -c "[ -e node_modules/.package-lock.json ] || npm ci --no-audit --no-fund;
+             npm run dev --workspace=@dtc/backend"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  storefront:
+    image: node:22-alpine
+    working_dir: /repo
+    environment:
+      NEXT_PUBLIC_MEDUSA_BACKEND_URL: http://localhost:9000
+      MEDUSA_BACKEND_URL: http://backend:9000
+      NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY: ${PUBLISHABLE_KEY:-}
+      NEXT_PUBLIC_DEFAULT_REGION: ${DEFAULT_REGION:-ua}
+    volumes:
+      - .:/repo
+      - storefront_root_modules:/repo/node_modules
+      - storefront_app_modules:/repo/apps/storefront/node_modules
+    ports:
+      - '127.0.0.1:8000:8000'
+    command: >
+      sh -c "[ -e node_modules/.package-lock.json ] || npm ci --workspace=@dtc/storefront --include-workspace-root --no-audit --no-fund;
+             npm run dev --workspace=@dtc/storefront"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:
+  backend_root_modules:
+  backend_app_modules:
+  storefront_root_modules:
+  storefront_app_modules:

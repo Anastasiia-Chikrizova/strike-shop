@@ -1,7 +1,8 @@
 import { HttpTypes } from "@medusajs/types"
 import { NextRequest, NextResponse } from "next/server"
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL
+const BACKEND_URL =
+  process.env.MEDUSA_BACKEND_URL || process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL
 const PUBLISHABLE_API_KEY = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY
 const DEFAULT_REGION = process.env.NEXT_PUBLIC_DEFAULT_REGION || "ua"
 
@@ -115,6 +116,17 @@ export async function middleware(request: NextRequest) {
   const country = countryCode || DEFAULT_REGION
   const firstPathSegment = request.nextUrl.pathname.split("/")[1]?.toLowerCase()
   const urlHasCountry = firstPathSegment === country.toLowerCase()
+
+  // the store listing is the default landing page
+  const isCountryRoot =
+    urlHasCountry && request.nextUrl.pathname.replace(/\/+$/, "") === `/${firstPathSegment}`
+
+  if (request.nextUrl.pathname === "/" || isCountryRoot) {
+    return NextResponse.redirect(
+      `${request.nextUrl.origin}/${country}/store${request.nextUrl.search || ""}`,
+      307
+    )
+  }
 
   if (urlHasCountry) {
     if (!cacheIdCookie) {
