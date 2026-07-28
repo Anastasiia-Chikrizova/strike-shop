@@ -57,3 +57,5 @@ Thumbs.db
 **/.DS_Store
 
 .idea
+**/.env.*
+!**/.env.template
