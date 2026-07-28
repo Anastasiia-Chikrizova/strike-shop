@@ -1,0 +1,108 @@
+name: strike-shop-${APP_ENV:?set APP_ENV=staging|prod}
+
+x-logging: &default-logging
+  driver: ${LOG_DRIVER:-json-file}
+  options:
+    max-size: '250m'
+    max-file: '7'
+
+services:
+  postgres:
+    profiles: [with-db]
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-medusa}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
+      POSTGRES_DB: ${POSTGRES_DB:-medusa}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-medusa} -d ${POSTGRES_DB:-medusa}']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+    logging: *default-logging
+
+  redis:
+    profiles: [with-db]
+    image: redis:7-alpine
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+    logging: *default-logging
+
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+      args:
+        APP_ENV: ${APP_ENV}
+    image: ${BACKEND_IMAGE:-strike-backend:${APP_ENV}}
+    env_file:
+      - ${BACKEND_ENV_FILE:?set BACKEND_ENV_FILE}
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
+      REDIS_URL: ${REDIS_URL:?set REDIS_URL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
+      redis:
+        condition: service_healthy
+        required: false
+    ports:
+      - '${BACKEND_PORT:-9000}:9000'
+    volumes:
+      - backend-static:/app/static
+    healthcheck:
+      test: ['CMD', 'wget', '--spider', '-q', 'http://127.0.0.1:9000/health']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    restart: unless-stopped
+    logging: *default-logging
+
+  storefront:
+    build:
+      context: .
+      dockerfile: apps/storefront/Dockerfile
+      args:
+        APP_ENV: ${APP_ENV}
+      secrets:
+        - source: storefront_env
+          target: app_env
+    image: ${STOREFRONT_IMAGE:-strike-storefront:${APP_ENV}}
+    env_file:
+      - ${STOREFRONT_ENV_FILE:?set STOREFRONT_ENV_FILE}
+    environment:
+      MEDUSA_BACKEND_URL: ${MEDUSA_BACKEND_URL:-http://backend:9000}
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - '${STOREFRONT_PORT:-8000}:8000'
+    healthcheck:
+      test: ['CMD', 'wget', '--spider', '-q', 'http://127.0.0.1:8000/api/health']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+    logging: *default-logging
+
+volumes:
+  pgdata:
+  redisdata:
+  backend-static:
+
+secrets:
+  storefront_env:
+    file: ${STOREFRONT_ENV_FILE}
