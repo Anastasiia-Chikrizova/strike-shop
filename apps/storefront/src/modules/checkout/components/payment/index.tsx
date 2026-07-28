@@ -1,22 +1,19 @@
 "use client"
-import { RadioGroup } from "@headlessui/react"
-import { paymentInfoMap } from "@lib/constants"
-import { initiatePaymentSession } from "@lib/data/cart"
-import { CheckCircleSolid, CreditCard } from "@medusajs/icons"
-import ErrorMessage from "@modules/checkout/components/error-message"
-import PaymentContainer from "@modules/checkout/components/payment-container"
+import { CheckCircleSolid } from "@medusajs/icons"
+import MonobankCheckout from "@modules/checkout/components/monobank-checkout"
 import Divider from "@modules/common/components/divider"
-import {
-  Button,
-  Container,
-  Heading,
-  Text,
-  clx,
-} from "@modules/common/components/ui"
+import { Heading, Text, clx } from "@modules/common/components/ui"
 import { HttpTypes } from "@medusajs/types"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { useCallback, useEffect, useState } from "react"
+import { useCallback } from "react"
 
+/**
+ * Крок оплати.
+ *
+ * Єдиний спосіб оплати — monobank. Ручний провайдер Medusa лишається
+ * під капотом: cart.complete() вимагає payment collection, тому сесія
+ * створюється мовчки перед переходом на сторінку оплати.
+ */
 const Payment = ({
   cart,
   availablePaymentMethods,
@@ -28,29 +25,22 @@ const Payment = ({
     (paymentSession) => paymentSession.status === "pending"
   )
 
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(
-    activeSession?.provider_id ?? ""
-  )
-
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
 
   const isOpen = searchParams.get("step") === "payment"
 
-  const setPaymentMethod = async (method: string) => {
-    setError(null)
-    setSelectedPaymentMethod(method)
-  }
-
   const paidByGiftcard = !!(
-    (cart as unknown as Record<string, unknown>)?.gift_cards && ((cart as unknown as Record<string, unknown>)?.gift_cards as unknown[])?.length > 0 && cart?.total === 0
+    (cart as unknown as Record<string, unknown>)?.gift_cards &&
+    ((cart as unknown as Record<string, unknown>)?.gift_cards as unknown[])
+      ?.length > 0 &&
+    cart?.total === 0
   )
 
   const paymentReady =
-    (activeSession && (cart?.shipping_methods?.length ?? 0) !== 0) || paidByGiftcard
+    (activeSession && (cart?.shipping_methods?.length ?? 0) !== 0) ||
+    paidByGiftcard
 
   const createQueryString = useCallback(
     (name: string, value: string) => {
@@ -67,35 +57,6 @@ const Payment = ({
       scroll: false,
     })
   }
-
-  const handleSubmit = async () => {
-    setIsLoading(true)
-    try {
-      const checkActiveSession =
-        activeSession?.provider_id === selectedPaymentMethod
-
-      if (!checkActiveSession) {
-        await initiatePaymentSession(cart, {
-          provider_id: selectedPaymentMethod,
-        })
-      }
-
-      return router.push(
-        pathname + "?" + createQueryString("step", "review"),
-        {
-          scroll: false,
-        }
-      )
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    setError(null)
-  }, [isOpen])
 
   return (
     <div className="bg-white">
@@ -127,26 +88,7 @@ const Payment = ({
       </div>
       <div>
         <div className={isOpen ? "block" : "hidden"}>
-          {!paidByGiftcard && availablePaymentMethods?.length && (
-            <>
-              <RadioGroup
-                value={selectedPaymentMethod}
-                onChange={(value: string) => setPaymentMethod(value)}
-              >
-                {availablePaymentMethods.map((paymentMethod) => (
-                  <div key={paymentMethod.id}>
-                    <PaymentContainer
-                      paymentInfoMap={paymentInfoMap}
-                      paymentProviderId={paymentMethod.id}
-                      selectedPaymentOptionId={selectedPaymentMethod}
-                    />
-                  </div>
-                ))}
-              </RadioGroup>
-            </>
-          )}
-
-          {paidByGiftcard && (
+          {paidByGiftcard ? (
             <div className="flex flex-col w-1/3">
               <Text className="txt-medium-plus text-ui-fg-base mb-1">
                 Payment method
@@ -158,58 +100,22 @@ const Payment = ({
                 Gift card
               </Text>
             </div>
+          ) : (
+            <MonobankCheckout
+              cart={cart}
+              /*
+                Свідомо не звіряємось із availablePaymentMethods: цей список
+                кешується, і після вмикання провайдера в регіоні кнопка
+                лишалась би заблокованою. Якщо провайдер не увімкнено,
+                Medusa поверне зрозумілу помилку при створенні сесії.
+              */
+              notReady={(cart.shipping_methods?.length ?? 0) === 0}
+            />
           )}
-
-          <ErrorMessage
-            error={error}
-            data-testid="payment-method-error-message"
-          />
-
-          <Button
-            size="large"
-            className="mt-6"
-            onClick={handleSubmit}
-            isLoading={isLoading}
-            disabled={!selectedPaymentMethod && !paidByGiftcard}
-            data-testid="submit-payment-button"
-          >
-            Continue to review
-          </Button>
         </div>
 
         <div className={isOpen ? "hidden" : "block"}>
-          {cart && paymentReady && activeSession ? (
-            <div className="flex items-start gap-x-1 w-full">
-              <div className="flex flex-col w-1/3">
-                <Text className="txt-medium-plus text-ui-fg-base mb-1">
-                  Payment method
-                </Text>
-                <Text
-                  className="txt-medium text-ui-fg-subtle"
-                  data-testid="payment-method-summary"
-                >
-                  {paymentInfoMap[activeSession?.provider_id]?.title ||
-                    activeSession?.provider_id}
-                </Text>
-              </div>
-              <div className="flex flex-col w-1/3">
-                <Text className="txt-medium-plus text-ui-fg-base mb-1">
-                  Payment details
-                </Text>
-                <div
-                  className="flex gap-2 txt-medium text-ui-fg-subtle items-center"
-                  data-testid="payment-details-summary"
-                >
-                  <Container className="flex items-center h-7 w-fit p-2 bg-ui-button-neutral-hover">
-                    {paymentInfoMap[selectedPaymentMethod]?.icon || (
-                      <CreditCard />
-                    )}
-                  </Container>
-                  <Text>Another step will appear</Text>
-                </div>
-              </div>
-            </div>
-          ) : paidByGiftcard ? (
+          {paidByGiftcard ? (
             <div className="flex flex-col w-1/3">
               <Text className="txt-medium-plus text-ui-fg-base mb-1">
                 Payment method
@@ -219,6 +125,18 @@ const Payment = ({
                 data-testid="payment-method-summary"
               >
                 Gift card
+              </Text>
+            </div>
+          ) : paymentReady ? (
+            <div className="flex flex-col w-1/3">
+              <Text className="txt-medium-plus text-ui-fg-base mb-1">
+                Payment method
+              </Text>
+              <Text
+                className="txt-medium text-ui-fg-subtle"
+                data-testid="payment-method-summary"
+              >
+                monobank
               </Text>
             </div>
           ) : null}

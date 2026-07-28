@@ -1,0 +1,84 @@
+name: build & push to ECR
+
+on:
+  push:
+    branches: [dev, master]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Куди збирати
+        type: choice
+        options: [staging, prod]
+        default: staging
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      APP_ENV: ${{ inputs.environment || (github.ref_name == 'master' && 'prod') || 'staging' }}
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      PLATFORM: ${{ vars.IMAGE_PLATFORM || 'linux/amd64' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Витягти env сторфронта з SSM
+        run: |
+          aws ssm get-parameter \
+            --name "/strike-shop/${APP_ENV}/storefront/env" \
+            --with-decryption \
+            --query Parameter.Value \
+            --output text > /tmp/storefront.env
+          test -s /tmp/storefront.env
+
+      - name: Backend
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/backend/Dockerfile
+          platforms: ${{ env.PLATFORM }}
+          build-args: APP_ENV=${{ env.APP_ENV }}
+          push: true
+          tags: |
+            ${{ steps.ecr.outputs.registry }}/strike-backend:${{ github.sha }}
+            ${{ steps.ecr.outputs.registry }}/strike-backend:${{ env.APP_ENV }}
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,scope=backend,mode=max
+
+      - name: Storefront
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/storefront/Dockerfile
+          platforms: ${{ env.PLATFORM }}
+          build-args: APP_ENV=${{ env.APP_ENV }}
+          secret-files: |
+            app_env=/tmp/storefront.env
+          push: true
+          tags: |
+            ${{ steps.ecr.outputs.registry }}/strike-storefront:${{ github.sha }}
+            ${{ steps.ecr.outputs.registry }}/strike-storefront:${{ env.APP_ENV }}
+          cache-from: type=gha,scope=storefront
+          cache-to: type=gha,scope=storefront,mode=max
+
+      - name: Прибрати env-файл
+        if: always()
+        run: rm -f /tmp/storefront.env
