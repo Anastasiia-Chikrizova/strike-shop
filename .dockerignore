@@ -16,6 +16,10 @@ apps/backend/.medusa
 **/.aws
 **/.ssh
 
+.github
+deploy
+docker-compose*.yml
+
 **/.DS_Store
 **/npm-debug.log*
 **/*.tsbuildinfo

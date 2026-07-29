@@ -1,0 +1,40 @@
+# Caddy сам випускає і продовжує Let's Encrypt-сертифікати.
+# Домени і пошта підставляються з env (див. deploy/stack.env.example).
+
+{
+	email {$ACME_EMAIL}
+	# Поки крутиш DNS — розкоментуй, щоб не впертись у ліміти Let's Encrypt
+	# (5 невдалих випусків на домен за годину), і закоментуй назад.
+	# acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+}
+
+# Бекенд: Store API, адмінка на /app, вебхук монобанку на /webhooks/monobank.
+{$BACKEND_DOMAIN} {
+	encode zstd gzip
+
+	# Тіло вебхука перевіряється за сирими байтами — нічого не переписуємо.
+	reverse_proxy backend:9000 {
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Forwarded-Host {host}
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}
+
+# Сторфронт.
+{$STOREFRONT_DOMAIN} {
+	encode zstd gzip
+
+	reverse_proxy storefront:8000 {
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Forwarded-Host {host}
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}
