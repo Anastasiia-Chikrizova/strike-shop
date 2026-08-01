@@ -3,12 +3,6 @@ import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { initMonoPayPaymentWorkflow } from "../../../../../workflows/init-monopay-payment"
 import { PostMonoPayInitSchema } from "../../middlewares"
 
-/**
- * POST /store/monobank/monopay/init
- *
- * Віддає віджету MonoPay чотири параметри для window.MonoPay.init().
- * Термін життя requestId — 10 хвилин, після цього треба питати заново.
- */
 export async function POST(
   req: MedusaRequest<PostMonoPayInitSchema>,
   res: MedusaResponse
@@ -25,7 +19,6 @@ export async function POST(
     amount: result.amount,
     ccy: result.ccy,
     reference: result.reference,
-    /** Скільки секунд ці дані ще дійсні. */
     expires_in: 600,
   })
 }

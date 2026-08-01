@@ -1,79 +1,65 @@
-# Деплой стейджа
+# Staging deployment
 
-Стейдж живе на одному інстансі **Oracle Cloud Always Free Ampere A1** (arm64,
-Frankfurt). Postgres, Redis, бекенд, сторфронт і Caddy крутяться там же в
-одному compose-стеку. Образи збирає GitHub Actions і кладе в GHCR — на сервері
-нічого не збирається.
-
-| Файл | Що це |
+| File | What it is |
 | --- | --- |
-| [`.github/workflows/build-push.yml`](../.github/workflows/build-push.yml) | збірка обох образів під `linux/arm64` → GHCR |
-| [`docker-compose.staging.yml`](../docker-compose.staging.yml) | деплойний стек: тільки `image:`, ніяких `build:` |
-| [`Caddyfile`](Caddyfile) | реверс-проксі + автоматичний Let's Encrypt |
-| [`deploy.sh`](deploy.sh) | pull → міграції → up → чекання healthy |
-| `*.env.example` | шаблони; справжні файли лежать у `/etc/strike-shop/` і в гіт не потрапляють |
+| [`.github/workflows/build-push.yml`](../.github/workflows/build-push.yml) | builds both images for `linux/arm64` → GHCR |
+| [`docker-compose.staging.yml`](../docker-compose.staging.yml) | deploy stack: only `image:`, no `build:` |
+| [`Caddyfile`](Caddyfile) | reverse proxy + automatic Let's Encrypt |
+| [`deploy.sh`](deploy.sh) | pull → migrate → up → wait for healthy |
+| `*.env.example` | templates; the real files live in `/etc/strike-shop/` and never go into git |
 
-`docker-compose.yml` у корені — це збірка з вихідників (локально/вручну),
-`docker-compose.dev.yml` — розробка. Для сервера потрібен тільки
+The `docker-compose.yml` in the repo root builds from source (local/manual),
+`docker-compose.dev.yml` is for development. The server only needs
 `docker-compose.staging.yml`.
 
 ---
 
-## 1. Що треба до початку
+## 1. Prerequisites
 
-- інстанс A1 з публічним IP і доступом по SSH;
-- два домени (або піддомени): `staging.…` для сторфронта, `api.staging.…` для
-  бекенда, обидва A-записами на цей IP;
-- тестовий токен монобанку з https://api.monobank.ua/.
+- a Linux VM with Docker;
+- a Cloudflare Tunnel pointed at that VM, and two domains (or subdomains):
+  `staging.…` for the storefront, `api.staging.…` for the backend, bound to
+  the tunnel (instead of A records pointing at a public IP);
+- a Monobank sandbox token from https://api.monobank.ua/.
 
-## 2. Сервер
+## 2. Server
 
-Docker з офіційного репозиторію (в дистрибутивному пакеті стара версія без
-`docker compose`):
+Docker from the official repo (the distro package ships an old version
+without `docker compose`):
 
 ```bash
 curl -fsSL https://get.docker.com | sudo sh
-sudo usermod -aG docker "$USER"   # перелогінитись
+sudo usermod -aG docker "$USER"   # log back in afterward
 ```
 
-**Мережа відкривається у двох місцях, і про друге забувають:**
+Public access goes through Cloudflare Tunnel (`cloudflared`), so 80/443 don't
+need to be opened externally — `caddy` in `docker-compose.staging.yml` only
+listens for what the tunnel forwards to it, and the tunnel itself is set up
+separately (TODO: document `cloudflared` as a service/container here once
+that's settled).
 
-1. VCN → Security Lists → Ingress: TCP 80 і 443 з `0.0.0.0/0`;
-2. локальний файрвол інстансу. В Ubuntu-образах Oracle у `iptables` стоїть
-   `REJECT` на все, крім 22. Трафік до опублікованих контейнерних портів іде
-   через `FORWARD`, тому часто працює і так, але якщо 80/443 мовчать при
-   відкритому Security List — дивитись саме сюди:
-
-```bash
-sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 80 -j ACCEPT
-sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 443 -j ACCEPT
-sudo netfilter-persistent save
-```
-
-(в Oracle Linux замість цього `firewall-cmd --add-service=http --permanent`.)
-
-Репозиторій потрібен на сервері тільки заради compose-файла і цього скрипта:
+The repo is only needed on the server for the compose file and this script:
 
 ```bash
 sudo git clone https://github.com/Anastasiia-Chikrizova/strike-shop /opt/strike-shop
 sudo chown -R "$USER" /opt/strike-shop
 ```
 
-## 3. Секрети на сервері
+## 3. Secrets on the server
 
 ```bash
 sudo mkdir -p /etc/strike-shop
 sudo cp /opt/strike-shop/deploy/*.env.example /etc/strike-shop/
-# перейменувати без .example, заповнити
+# rename dropping .example, then fill in
 sudo chmod 600 /etc/strike-shop/*.env
 ```
 
-Генерація секретів: `openssl rand -base64 32` для `JWT_SECRET`,
-`COOKIE_SECRET`, `AUTH_MFA_ENCRYPTION_KEY`, `openssl rand -base64 24` для
-пароля Postgres (він же в `DATABASE_URL` — тримати синхронно).
+Generating secrets: `openssl rand -base64 32` for `JWT_SECRET`,
+`COOKIE_SECRET`, `AUTH_MFA_ENCRYPTION_KEY`; `openssl rand -base64 24` for the
+Postgres password (also used in `DATABASE_URL` — keep them in sync).
 
-Доступ до GHCR (образи приватні, поки пакет не зроблено публічним) — PAT з
-єдиним правом `read:packages`:
+GHCR access (images are private until the package is made public) — a PAT
+with only the `read:packages` scope:
 
 ```bash
 echo "<PAT>" | docker login ghcr.io -u Anastasiia-Chikrizova --password-stdin
@@ -81,21 +67,22 @@ echo "<PAT>" | docker login ghcr.io -u Anastasiia-Chikrizova --password-stdin
 
 ## 4. GitHub
 
-Settings → Environments → **staging** (і згодом **prod**), у кожному секрет
-`STOREFRONT_ENV` — вміст `storefront.env` цілком, як текст. Воркфлоу підбирає
-Environment за гілкою: `dev` → staging, `master` → prod.
+Settings → Environments → **staging** (and later **prod**), each with a
+secret named `STOREFRONT_ENV` — the full contents of `storefront.env` as
+text. The workflow picks the Environment based on the branch: `dev` →
+staging, `master` → prod.
 
 ---
 
-## 5. Перший деплой
+## 5. First deployment
 
-Порядок не довільний: `NEXT_PUBLIC_*` вшиваються у бандл на збірці, а
-publishable key з'являється тільки після першого запуску бекенда. Тому спершу
-піднімається бекенд, і лише потім збирається сторфронт.
+The order isn't arbitrary: `NEXT_PUBLIC_*` values get baked into the bundle
+at build time, and the publishable key only exists after the backend has run
+once. So the backend goes up first, and only then is the storefront built.
 
-**1. Зібрати бекенд.** Пуш у `dev` або Actions → Run workflow → staging.
+**1. Build the backend.** Push to `dev`, or Actions → Run workflow → staging.
 
-**2. Підняти базу і бекенд:**
+**2. Bring up the database and backend:**
 
 ```bash
 cd /opt/strike-shop
@@ -108,106 +95,111 @@ compose --profile tools run --rm migrate
 compose up -d backend caddy
 ```
 
-Сторфронт-домен поки віддає 502 — це нормально, апстріму ще немає.
+The storefront domain will return 502 for now — that's expected, there's no
+upstream yet.
 
-**3. Створити адміна:**
+**3. Create an admin user:**
 
 ```bash
-compose run --rm backend npx medusa user -e admin@strike.shop -p '<пароль>'
+compose run --rm backend npx medusa user -e admin@strike.shop -p '<password>'
 ```
 
-**4. Взяти publishable key** в адмінці `https://api.staging.…/app` →
-Settings → Publishable API keys, і там же ввімкнути монобанк:
+**4. Grab the publishable key** in the admin at `https://api.staging.…/app` →
+Settings → Publishable API keys, and enable Monobank there too:
 Settings → Regions → Ukraine → Payment providers → `monobank`.
 
-**5. Заповнити `storefront.env`** ключем і доменами, покласти той самий вміст
-у секрет `STOREFRONT_ENV`, перезапустити воркфлоу.
+**5. Fill in `storefront.env`** with the key and domains, put the same
+contents into the `STOREFRONT_ENV` secret, and re-run the workflow.
 
-**6. Викотити все:**
+**6. Roll everything out:**
 
 ```bash
 ./deploy/deploy.sh
 ```
 
-## 6. Звичайний деплой
+## 6. Routine deployment
 
 ```bash
 cd /opt/strike-shop && git pull && ./deploy/deploy.sh
 ```
 
-Скрипт тягне образи за тегом `staging`, проганяє міграції, піднімає стек і
-чекає, поки обидва застосунки стануть `healthy`. Якщо ні — друкує логи і
-виходить з ненульовим кодом.
+The script pulls images tagged `staging`, runs migrations, brings up the
+stack, and waits for both apps to report `healthy`. If they don't, it prints
+the logs and exits non-zero.
 
-Відкат на конкретний білд (тег = sha коміту, він є в summary воркфлоу):
+Rolling back to a specific build (tag = commit sha, found in the workflow
+summary):
 
 ```bash
 TAG=9f2c1ab ./deploy/deploy.sh
 ```
 
-Міграції назад не відкочуються — відкат образу з несумісною схемою БД не
-врятує. На стейджі це терпимо, для прода тримати `pg_dump` перед викоткою.
+Migrations don't roll back — rolling back the image with an incompatible DB
+schema won't save you. Tolerable on staging; for prod, take a `pg_dump`
+before rolling out.
 
-## 7. Монобанк на стейджі
+## 7. Monobank on staging
 
-Пісочниця відрізняється **тільки токеном** — `MONO_API_URL` той самий бойовий
-`https://api.monobank.ua`. Обидва URL мають бути публічними https, інакше
-вебхук не дійде і оплата зависне в `pending`:
+The sandbox differs **only in the token** — `MONO_API_URL` is the same
+production `https://api.monobank.ua`. Both URLs must be public https,
+otherwise the webhook won't arrive and the payment will hang in `pending`:
 
 ```
 MONO_WEBHOOK_URL=https://api.staging.…/webhooks/monobank
 MONO_REDIRECT_URL=https://staging.…/ua/monobank/return
 ```
 
-Перевірка після викотки — таблиця `monobank_webhook_log` наповнюється (туди
-пишуться і ті вебхуки, що не пройшли підпис). Деталі інтеграції —
-[apps/backend/src/lib/monobank/README.md](../apps/backend/src/lib/monobank/README.md).
+Verify after rollout by checking that the `monobank_webhook_log` table is
+filling up (it also records webhooks that failed signature verification).
+Integration details: [apps/backend/src/lib/monobank/README.md](../apps/backend/src/lib/monobank/README.md).
 
-## 8. Відома проблема: міграції в контейнері
+## 8. Known issue: migrations inside the container
 
-**Перевірено локально (Docker Desktop, macOS/arm64):** `npx medusa db:migrate`
-всередині контейнера зависає. Процес засинає в `epoll_wait`, міграції не
-застосовуються, і Medusa обриває його власною перевіркою:
+**Verified locally (Docker Desktop, macOS/arm64):** `npx medusa db:migrate`
+hangs inside the container. The process goes to sleep in `epoll_wait`,
+migrations never apply, and Medusa's own timeout kills it:
 
 ```
 Could not connect to the database while running migrations.
 The connection timed out after 10 seconds
 ```
 
-Повідомлення оманливе — з базою все гаразд. Що виключено вимірюваннями:
+The message is misleading — the database is fine. What's been ruled out by
+testing:
 
-| Підозра | Спростування |
+| Suspect | Ruled out because |
 | --- | --- |
-| Недоступна БД | сирий `pg` з того ж контейнера — 37 мс, `knex` — 96 мс |
-| SSL | у `createPgConnection` ssl за замовчуванням `false` |
-| Redis | без `REDIS_URL` зависає так само |
-| Стан БД | зависає і на чистій, і на вже мігрованій |
-| Версія Node | 20 і 22 зависають однаково |
-| Базовий образ | alpine (musl) і bookworm (glibc) — однаково |
-| Артефакт збірки | той самий `.medusa/server` на хості відпрацьовує повністю (145 таблиць) |
-| Батьківські `node_modules` | підмонтовані в контейнер — не допомогло |
+| Unreachable DB | raw `pg` from the same container — 37ms, `knex` — 96ms |
+| SSL | `createPgConnection` defaults ssl to `false` |
+| Redis | hangs the same way without `REDIS_URL` |
+| DB state | hangs on both a fresh and an already-migrated DB |
+| Node version | 20 and 22 hang identically |
+| Base image | alpine (musl) and bookworm (glibc) — same result |
+| Build artifact | the same `.medusa/server` runs fine on the host (145 tables) |
+| Parent `node_modules` | mounted into the container — didn't help |
 
-Закономірність одна: **в Docker — завжди зависає, поза Docker — завжди
-проходить.** Схоже на артефакт Docker Desktop на macOS, тому першою справою
-варто просто спробувати на самому інстансі — там справжній Linux і справжній
-Docker.
+There's one consistent pattern: **inside Docker it always hangs, outside
+Docker it always works.** Looks like a Docker Desktop on macOS artifact, so
+the first thing to try is just running it on the actual instance — real
+Linux, real Docker.
 
-Якщо на сервері відтвориться, обхідний шлях: поставити Node 20 на сам інстанс,
-склонувати репозиторій і прогнати міграції з хоста проти контейнерного
-Postgres (тимчасово опублікувавши його порт на `127.0.0.1`). Сам застосунок у
-контейнері працює нормально — перевірено, бекенд і сторфронт піднімаються
-healthy на вже мігрованій базі.
+If it reproduces on the server, the workaround is: install Node 20 on the
+instance itself, clone the repo, and run migrations from the host against the
+containerized Postgres (temporarily publishing its port on `127.0.0.1`). The
+app itself runs fine in the container — verified, both backend and
+storefront come up healthy against an already-migrated database.
 
-Ліміт перевірки, до речі, налаштовується:
-`MEDUSA_DB_MIGRATION_CONNECTION_TIMEOUT` (мілісекунди). Підняття не рятує —
-процес просто висить довше.
+The timeout is configurable, by the way:
+`MEDUSA_DB_MIGRATION_CONNECTION_TIMEOUT` (milliseconds). Raising it doesn't
+fix anything — the process just hangs longer.
 
-## 9. Чого тут свідомо немає
+## 9. Deliberately out of scope here
 
-- **бекапів** — для стейджа зайве, для прода мінімум `pg_dump` по крону в
-  Object Storage (він теж у Always Free);
-- **закриття стейджа від сторонніх** — basic auth у Caddy зламає вебхук
-  монобанку, тому робити його треба вибірково, не на весь домен;
-- **окремого воркера Medusa** — один інстанс тягне і API, і фонові джоби
-  (`MEDUSA_WORKER_MODE` за замовчуванням `shared`). Розділяти є сенс, коли
-  з'явиться друга машина.
+- **backups** — unnecessary for staging; for prod, at minimum a cron
+  `pg_dump` into Cloudflare R2 (same bucket as images, or a separate one);
+- **locking staging down from outsiders** — basic auth in Caddy would break
+  the Monobank webhook, so it needs to be applied selectively, not to the
+  whole domain;
+- **a separate Medusa worker** — one instance handles both the API and
+  background jobs (`MEDUSA_WORKER_MODE` defaults to `shared`). Splitting
+  makes sense once there's a second machine.

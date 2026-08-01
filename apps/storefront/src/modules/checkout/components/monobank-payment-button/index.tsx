@@ -14,11 +14,6 @@ type MonobankPaymentButtonProps = {
   "data-testid"?: string
 }
 
-/**
- * Створює рахунок у Monobank і перенаправляє на сторінку оплати.
- * Сам redirect робить server action — на клієнті лишається тільки
- * стан завантаження та помилки.
- */
 const MonobankPaymentButton: React.FC<MonobankPaymentButtonProps> = ({
   countryCode,
   cartId,
@@ -35,7 +30,6 @@ const MonobankPaymentButton: React.FC<MonobankPaymentButtonProps> = ({
     try {
       await startMonobankPayment(countryCode, cartId)
     } catch (e) {
-      // NEXT_REDIRECT — це успішний редірект, а не помилка.
       if (isRedirectError(e)) {
         return
       }

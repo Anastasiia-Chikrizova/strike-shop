@@ -8,11 +8,6 @@ import { redirect } from "next/navigation"
 import { initiatePaymentSession, retrieveCart } from "./cart"
 import { getAuthHeaders, getCartId } from "./cookies"
 
-/**
- * Monobank Acquiring: створення платежу та перевірка статусу.
- * Ендпоінти віддає бекенд (apps/backend/src/api/store/monobank).
- */
-
 const INVOICE_COOKIE = "_monobank_invoice"
 
 export type MonobankInvoice = {
@@ -43,7 +38,6 @@ export type MonobankPaymentStatus = {
   modified_date?: string
 }
 
-/** Створює рахунок і повертає посилання на сторінку оплати Monobank. */
 export async function createMonobankPayment(input?: {
   cartId?: string
   destination?: string
@@ -68,18 +62,6 @@ export async function createMonobankPayment(input?: {
   })
 }
 
-/**
- * Server action для кнопки «Оплатити».
- *
- * Рахунок створює платіжний провайдер Medusa: ініціюємо сесію оплати,
- * забираємо з її `data` посилання на сторінку Monobank і йдемо туди.
- * Завдяки цьому cart.complete() потім сам перевірить статус у Monobank,
- * а адмінка отримає справжній Captured і робочу кнопку Refund.
- *
- * Monobank повертає користувача на redirectUrl без ідентифікатора рахунку,
- * тому invoiceId кладемо в httpOnly-cookie — за ним сторінка повернення
- * знаходить платіж.
- */
 export async function startMonobankPayment(
   countryCode: string,
   cartId?: string
@@ -119,22 +101,14 @@ export async function startMonobankPayment(
     cookies.set(INVOICE_COOKIE, data.invoice_id, {
       maxAge: 60 * 60 * 24,
       httpOnly: true,
-      sameSite: "lax", // повернення з Monobank — це крос-сайтова навігація
+      sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
     })
   }
 
-  // redirect() кидає NEXT_REDIRECT — має бути поза try/catch.
   redirect(data.page_url)
 }
 
-/**
- * Origin, з якого користувач реально відкрив сайт.
- *
- * Брати NEXT_PUBLIC_BASE_URL напряму не можна: там легко опиняється
- * https для локального dev-сервера на http, і Monobank повертає
- * користувача на адресу, якої не існує (ERR_SSL_PROTOCOL_ERROR).
- */
 export async function getOrigin(): Promise<string> {
   try {
     const headers = await nextHeaders()
@@ -147,7 +121,6 @@ export async function getOrigin(): Promise<string> {
       return `${protocol}://${host}`
     }
   } catch {
-    // Поза контекстом запиту — падаємо на конфіг.
   }
 
   return process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:8000"
@@ -174,7 +147,6 @@ export async function clearMonobankInvoice(): Promise<void> {
   cookies.set(INVOICE_COOKIE, "", { maxAge: -1 })
 }
 
-/** Перевірка статусу платежу. Без invoiceId бере його з cookie. */
 export async function retrieveMonobankPayment(
   invoiceId?: string
 ): Promise<MonobankPaymentStatus | null> {

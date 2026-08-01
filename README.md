@@ -1,67 +1,67 @@
 # strike-shop
 
-Монорепозиторій магазину: бекенд на Medusa (`apps/backend`) і сторфронт на
-Next.js (`apps/storefront`). Пакетний менеджер — npm, скрипти проганяються
-через turbo.
+Monorepo for the shop: a Medusa backend (`apps/backend`) and a Next.js
+storefront (`apps/storefront`). Package manager is npm, scripts run through
+turbo.
 
-## Локальний запуск
+## Running locally
 
-Потрібні Node.js 20+, PostgreSQL 15+ і Redis (опційно — без `REDIS_URL`
-Medusa працює на in-memory реалізаціях).
+Requires Node.js 20+, PostgreSQL 15+, and Redis (optional — without
+`REDIS_URL` Medusa falls back to in-memory implementations).
 
-1. Встановити залежності:
+1. Install dependencies:
 
 ```bash
 npm install
 ```
 
-2. Створити env бекенда і вписати `DATABASE_URL`:
+2. Create the backend env file and fill in `DATABASE_URL`:
 
 ```bash
 cp apps/backend/.env.template apps/backend/.env
 ```
 
-3. Прогнати міграції (з `apps/backend`):
+3. Run migrations (from `apps/backend`):
 
 ```bash
 npx medusa db:migrate
 ```
 
-4. Створити адміна (з `apps/backend`):
+4. Create an admin user (from `apps/backend`):
 
 ```bash
 npx medusa user -e admin@test.com -p supersecret
 ```
 
-5. Запустити обидва застосунки:
+5. Start both apps:
 
 ```bash
 npm run dev
 ```
 
-Бекенд — `http://localhost:9000` (адмінка на `/app`), сторфронт —
+Backend at `http://localhost:9000` (admin at `/app`), storefront at
 `http://localhost:8000`.
 
-Публішабл-ключ береться в адмінці: Settings → Publishable API key. Його треба
-покласти в `apps/storefront/.env.local`.
+Grab the publishable key from the admin: Settings → Publishable API key. Put
+it in `apps/storefront/.env.local`.
 
-## Змінні оточення сторфронта
+## Storefront environment variables
 
-| Змінна | Опис | Дефолт |
+| Variable | Description | Default |
 |---|---|---|
-| `NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY` | Publishable API key з бекенда | — |
-| `NEXT_PUBLIC_MEDUSA_BACKEND_URL` | Публічний URL бекенда, вшивається в бандл на збірці | `http://localhost:9000` |
-| `MEDUSA_BACKEND_URL` | Приватний URL бекенда для серверних викликів | значення `NEXT_PUBLIC_MEDUSA_BACKEND_URL` |
-| `NEXT_PUBLIC_DEFAULT_REGION` | Код країни регіону за замовчуванням | `ua` |
-| `NEXT_PUBLIC_BASE_URL` | Базовий URL сторфронта | `https://localhost:8000` |
+| `NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY` | Publishable API key from the backend | — |
+| `NEXT_PUBLIC_MEDUSA_BACKEND_URL` | Public backend URL, baked into the bundle at build time | `http://localhost:9000` |
+| `MEDUSA_BACKEND_URL` | Private backend URL for server-side calls | value of `NEXT_PUBLIC_MEDUSA_BACKEND_URL` |
+| `NEXT_PUBLIC_DEFAULT_REGION` | Default region country code | `ua` |
+| `NEXT_PUBLIC_BASE_URL` | Storefront base URL | `https://localhost:8000` |
 
-## Деплой
+## Deployment
 
-Стейдж — один інстанс Oracle Cloud A1 (arm64), образи збирає GitHub Actions і
-кладе в GHCR. Порядок дій, налаштування сервера і секрети описані в
-[deploy/README.md](deploy/README.md).
+Staging runs on a Linux VM (amd64), exposed via Cloudflare Tunnel. Images are
+built by GitHub Actions and pushed to GHCR. Steps, server setup, and secrets
+are described in [deploy/README.md](deploy/README.md).
 
-## Оплата
+## Payments
 
-Інтеграція з Monobank описана окремо:
+The Monobank integration is documented separately:
 [apps/backend/src/lib/monobank/README.md](apps/backend/src/lib/monobank/README.md).

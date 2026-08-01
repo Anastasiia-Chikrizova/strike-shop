@@ -38,10 +38,6 @@ export class MonobankClient {
     this.options = options
   }
 
-  /**
-   * Токен читаємо ліниво, щоб відсутність MONO_KEY валила конкретний
-   * запит, а не старт усього застосунку.
-   */
   private get token(): string {
     const token = this.options.token ?? process.env.MONO_KEY
 
@@ -110,7 +106,6 @@ export class MonobankClient {
     return payload as T
   }
 
-  /** POST /api/merchant/invoice/create — створення рахунку та посилання на оплату. */
   createInvoice(input: CreateInvoiceInput): Promise<CreateInvoiceResponse> {
     return this.request<CreateInvoiceResponse>({
       method: "POST",
@@ -119,7 +114,6 @@ export class MonobankClient {
     })
   }
 
-  /** GET /api/merchant/invoice/status — поточний статус рахунку. */
   getInvoiceStatus(invoiceId: string): Promise<InvoiceStatusResponse> {
     return this.request<InvoiceStatusResponse>({
       method: "GET",
@@ -128,10 +122,6 @@ export class MonobankClient {
     })
   }
 
-  /**
-   * POST /api/merchant/invoice/cancel — повернення коштів
-   * (повне або часткове, якщо передати amount у копійках).
-   */
   cancelInvoice(input: {
     invoiceId: string
     amount?: number
@@ -144,10 +134,6 @@ export class MonobankClient {
     })
   }
 
-  /**
-   * POST /api/merchant/invoice/finalize — списання заблокованих коштів
-   * для рахунків із paymentType: "hold".
-   */
   finalizeInvoice(input: {
     invoiceId: string
     amount: number
@@ -160,7 +146,6 @@ export class MonobankClient {
     })
   }
 
-  /** POST /api/merchant/invoice/remove — скасування ще не оплаченого рахунку. */
   removeInvoice(invoiceId: string): Promise<Record<string, never>> {
     return this.request({
       method: "POST",
@@ -169,10 +154,6 @@ export class MonobankClient {
     })
   }
 
-  /**
-   * GET /api/merchant/pubkey — публічний ключ для перевірки підпису вебхуків.
-   * Ключ треба кешувати (див. ./webhook.ts), ендпоінт має жорсткий rate limit.
-   */
   getPublicKey(): Promise<{ key: string }> {
     return this.request<{ key: string }>({
       method: "GET",
@@ -180,10 +161,6 @@ export class MonobankClient {
     })
   }
 
-  /**
-   * GET /api/merchant/monopay/pubkey-list — наші публічні ключі для MonoPay.
-   * API віддає `{ list: [...] }`; голий масив приймаємо про запас.
-   */
   listMonoPayKeys(): Promise<MonoPayKey[]> {
     return this.request<{ list?: MonoPayKey[] } | MonoPayKey[]>({
       method: "GET",
@@ -193,9 +170,7 @@ export class MonobankClient {
     )
   }
 
-  /** POST /api/merchant/monopay/pubkey-import — завантажити публічний ключ. */
   importMonoPayKey(input: {
-    /** Публічний ключ у base64 (base64 від PEM). */
     keyValue: string
     keyName?: string
     expiresAt?: string
@@ -207,7 +182,6 @@ export class MonobankClient {
     })
   }
 
-  /** POST /api/merchant/monopay/pubkey-delete — прибрати скомпрометований ключ. */
   deleteMonoPayKey(keyId: string): Promise<unknown> {
     return this.request({
       method: "POST",
@@ -233,5 +207,4 @@ function safeJsonParse(raw: string): any {
   }
 }
 
-/** Спільний інстанс для роутів. */
 export const monobank = new MonobankClient()

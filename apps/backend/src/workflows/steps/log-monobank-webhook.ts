@@ -3,7 +3,6 @@ import { createStep, StepResponse } from "@medusajs/framework/workflows-sdk"
 import { MONOBANK_MODULE } from "../../modules/monobank"
 import MonobankModuleService from "../../modules/monobank/service"
 
-/** Обрізаємо сире тіло, щоб зіпсований запит не роздув таблицю логів. */
 const MAX_RAW_BODY_LENGTH = 20_000
 
 export type LogMonobankWebhookInput = {
@@ -17,7 +16,6 @@ export type LogMonobankWebhookInput = {
   error?: string
 }
 
-/** Пише в лог кожен вхідний вебхук — зокрема ті, що не пройшли підпис. */
 export const logMonobankWebhookStep = createStep(
   "log-monobank-webhook",
   async (input: LogMonobankWebhookInput, { container }) => {

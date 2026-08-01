@@ -3,39 +3,17 @@ import crypto from "crypto"
 import { monobank, MonobankClient, MonobankError } from "./client"
 import { CreateInvoiceInput } from "./types"
 
-/**
- * MonoPay — платіжна кнопка, яку віджет ініціалізує прямо в браузері.
- *
- * На відміну від класичного invoice/create, тут інвойс створює фронтенд,
- * тому дані замовлення підписуються нашим приватним ключем ECDSA P-256,
- * а Monobank перевіряє підпис публічним ключем, який ми туди імпортували.
- *
- * https://monobank.ua/api-docs/acquiring/methods/monopay/docs--signature-example
- */
-
-/** keyId живе довго, але тримати кеш вічно не варто. */
 const KEY_ID_TTL_MS = 60 * 60 * 1000
 
 export type MonoPayRequest = {
-  /** Ідентифікатор нашого публічного ключа в Monobank (pk_test_…). */
   keyId: string
-  /** base64(DER ECDSA-підпис від JSON.stringify(payload) + requestId). */
   signature: string
-  /** Унікальний ідентифікатор запиту, TTL 10 хвилин. */
   requestId: string
-  /** base64 від того самого JSON, який підписано. */
   payloadBase64: string
 }
 
 let keyIdCache: { keyId: string; fetchedAt: number } | null = null
 
-/**
- * Підписує дані замовлення.
- *
- * КРИТИЧНО: JSON серіалізується РІВНО ОДИН раз — і підпис, і payloadBase64
- * робляться з одного рядка. Дві окремі серіалізації колись розійдуться
- * (інший порядок ключів, інші пробіли), і Monobank відхилить підпис.
- */
 export function signMonoPayPayload(
   payload: CreateInvoiceInput,
   options: { requestId?: string; privateKeyPem?: string } = {}
@@ -44,8 +22,6 @@ export function signMonoPayPayload(
   const requestId = options.requestId ?? crypto.randomUUID()
   const privateKey = loadPrivateKey(options.privateKeyPem)
 
-  // createSign сам хеширує SHA-256 — окремо хешувати не треба,
-  // інакше вийде подвійний хеш і невалідний підпис.
   const signature = crypto
     .createSign("SHA256")
     .update(json + requestId)
@@ -58,11 +34,6 @@ export function signMonoPayPayload(
   }
 }
 
-/**
- * Приватний ключ ніколи не виходить за межі бекенда.
- * Приймаємо як звичайний PEM, так і PEM у base64 або з екранованими \n —
- * усе це трапляється залежно від того, як ключ поклали в оточення.
- */
 export function loadPrivateKey(pem?: string): crypto.KeyObject {
   const raw = pem ?? process.env.MONOPAY_PRIVATE_KEY
 
@@ -100,10 +71,6 @@ export function loadPrivateKey(pem?: string): crypto.KeyObject {
   return key
 }
 
-/**
- * keyId нашого публічного ключа. Явний MONOPAY_KEY_ID має пріоритет,
- * інакше беремо перший активний зі списку і кешуємо на годину.
- */
 export async function getMonoPayKeyId(
   client: MonobankClient = monobank
 ): Promise<string> {
@@ -130,7 +97,6 @@ export async function getMonoPayKeyId(
   return keyId
 }
 
-/** Для тестів і після видалення ключа. */
 export function resetKeyIdCache(): void {
   keyIdCache = null
 }

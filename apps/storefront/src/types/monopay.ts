@@ -1,9 +1,3 @@
-/**
- * Типи глобального віджета MonoPay.
- * Скрипт вантажиться з pay.monobank.ua і кладе MonoPay у window.
- *
- * https://monobank.ua/api-docs/acquiring/methods/monopay/docs--js-widget
- */
 
 export type MonoPayUiOptions = {
   buttonType?: "base" | "pay" | "subscribe"

@@ -42,10 +42,6 @@ type LanguageSelectProps = {
   currentLocale: string | null
 }
 
-/**
- * Gets the localized display name for a language code using Intl API.
- * Falls back to the provided name if Intl is unavailable.
- */
 const getLocalizedLanguageName = (
   code: string,
   fallbackName: string,

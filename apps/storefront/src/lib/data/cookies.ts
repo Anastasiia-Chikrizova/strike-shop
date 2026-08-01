@@ -73,10 +73,6 @@ export type PendingCustomer = {
   phone?: string
 }
 
-// During the email verification flow the customer record isn't created until
-// the customer verifies their email and logs in. We temporarily persist the
-// extra signup fields in a cookie so they survive the customer leaving to open
-// their inbox, and read them back when creating the customer at login.
 export const setPendingCustomer = async (customer: PendingCustomer) => {
   const cookies = await nextCookies()
   cookies.set("_medusa_pending_customer", JSON.stringify(customer), {

@@ -12,8 +12,6 @@ const VerifyAccount = () => {
   const searchParams = useSearchParams()
   const token = searchParams.get("token")
   const [state, setState] = useState<VerificationState>("verifying")
-  // Guard against the effect running twice in React Strict Mode, which would
-  // consume the single-use token before the customer sees the result.
   const confirmed = useRef(false)
 
   useEffect(() => {

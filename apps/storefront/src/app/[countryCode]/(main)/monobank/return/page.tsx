@@ -12,13 +12,6 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic"
 
-/**
- * Сторінка, на яку Monobank повертає користувача після оплати.
- *
- * Це лише UI: остаточне підтвердження приходить вебхуком
- * (POST /webhooks/monobank на бекенді), бо користувач може закрити
- * вкладку й ніколи сюди не повернутись.
- */
 export default async function MonobankReturnPage() {
   const payment = await retrieveMonobankPayment()
 
@@ -123,7 +116,6 @@ function BackToCart({ label = "Повернутись до кошика" }: { la
   )
 }
 
-/** Monobank повертає суму в копійках. */
 function formatAmount(amount: number, ccy: number): string {
   const currency = { 980: "UAH", 840: "USD", 978: "EUR" }[ccy] ?? "UAH"
 

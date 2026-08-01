@@ -1,7 +1,3 @@
-/**
- * `redirect()` у server action кидає спеціальну помилку з digest NEXT_REDIRECT.
- * Це успішний редірект, а не збій — його не можна показувати користувачу.
- */
 export function isRedirectError(error: unknown): boolean {
   return (
     typeof error === "object" &&

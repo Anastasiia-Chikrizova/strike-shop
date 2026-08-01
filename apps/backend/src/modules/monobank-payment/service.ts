@@ -37,16 +37,11 @@ import {
 import { verifyMonobankSignature } from "../../lib/monobank/webhook"
 
 type Options = {
-  /** Токен мерчанта. За замовчуванням береться з MONO_KEY. */
   apiKey?: string
   apiUrl?: string
-  /** "debit" — кошти списуються одразу, "hold" — блокуються до capture. */
   paymentType?: MonobankPaymentType
-  /** Куди Monobank поверне користувача, якщо сторефронт не передав своє. */
   redirectUrl?: string
-  /** Публічний URL вебхука Medusa: /hooks/payment/monobank_monobank */
   webhookUrl?: string
-  /** Час життя рахунку в секундах. */
   validity?: number
 }
 
@@ -64,15 +59,6 @@ const CCY_BY_CURRENCY_CODE: Record<string, number> = {
   eur: 978,
 }
 
-/**
- * Платіжний провайдер Monobank Acquiring.
- *
- * Завдяки йому Medusa веде життєвий цикл платежу сама: сесія оплати
- * створює рахунок, cart.complete() перевіряє його статус, а кнопки
- * «Capture» і «Refund» в адмінці ходять у реальний Monobank.
- *
- * https://monobank.ua/api-docs/acquiring/
- */
 class MonobankPaymentProviderService extends AbstractPaymentProvider<Options> {
   static identifier = "monobank"
 
@@ -100,10 +86,6 @@ class MonobankPaymentProviderService extends AbstractPaymentProvider<Options> {
     }
   }
 
-  /**
-   * Створює рахунок у Monobank. `page_url` із відповіді потрапляє в
-   * `data` сесії — сторефронт бере його звідти й робить redirect.
-   */
   async initiatePayment(
     input: InitiatePaymentInput
   ): Promise<InitiatePaymentOutput> {
@@ -117,7 +99,6 @@ class MonobankPaymentProviderService extends AbstractPaymentProvider<Options> {
         amount,
         ccy,
         merchantPaymInfo: {
-          // reference повертається у вебхуці — так знаходимо сесію Medusa.
           reference: sessionId,
           destination:
             (context?.destination as string) ?? "Оплата замовлення",
@@ -146,12 +127,6 @@ class MonobankPaymentProviderService extends AbstractPaymentProvider<Options> {
     }
   }
 
-  /**
-   * Викликається під час cart.complete(). Питаємо Monobank, чи гроші дійшли.
-   *
-   * При paymentType "debit" кошти вже списані, тому повертаємо `captured` —
-   * Medusa створить платіж і одразу закриє його як захоплений.
-   */
   async authorizePayment(
     input: AuthorizePaymentInput
   ): Promise<AuthorizePaymentOutput> {
@@ -163,10 +138,6 @@ class MonobankPaymentProviderService extends AbstractPaymentProvider<Options> {
     }
   }
 
-  /**
-   * Для "debit" кошти вже в мерчанта — списувати нічого.
-   * Для "hold" довершуємо блокування через finalize.
-   */
   async capturePayment(
     input: CapturePaymentInput
   ): Promise<CapturePaymentOutput> {
@@ -194,10 +165,6 @@ class MonobankPaymentProviderService extends AbstractPaymentProvider<Options> {
     return { data: this.mergeData(input.data, await this.retrieveInvoice(input.data)) }
   }
 
-  /**
-   * Повернення коштів. Саме сюди веде кнопка «Refund» в адмінці.
-   * Monobank підтримує часткове повернення — сума в копійках.
-   */
   async refundPayment(
     input: RefundPaymentInput
   ): Promise<RefundPaymentOutput> {
@@ -222,10 +189,6 @@ class MonobankPaymentProviderService extends AbstractPaymentProvider<Options> {
     return { data: this.mergeData(input.data, await this.retrieveInvoice(input.data)) }
   }
 
-  /**
-   * Скасування замовлення: неоплачений рахунок прибираємо,
-   * оплачений — повертаємо повністю.
-   */
   async cancelPayment(
     input: CancelPaymentInput
   ): Promise<CancelPaymentOutput> {
@@ -244,7 +207,6 @@ class MonobankPaymentProviderService extends AbstractPaymentProvider<Options> {
         await this.client_.removeInvoice(data.invoice_id)
       }
     } catch (e) {
-      // Рахунок міг уже протухнути — це не привід ламати скасування замовлення.
       this.logger_.warn(
         `[monobank] Не вдалося скасувати рахунок ${data.invoice_id}: ${(e as Error).message}`
       )
@@ -253,7 +215,6 @@ class MonobankPaymentProviderService extends AbstractPaymentProvider<Options> {
     return { data: input.data ?? {} }
   }
 
-  /** Користувач обрав інший спосіб оплати — прибираємо рахунок. */
   async deletePayment(
     input: DeletePaymentInput
   ): Promise<DeletePaymentOutput> {
@@ -291,10 +252,6 @@ class MonobankPaymentProviderService extends AbstractPaymentProvider<Options> {
     return { data: invoice as unknown as Record<string, unknown> }
   }
 
-  /**
-   * Суму рахунку в Monobank змінити не можна — якщо кошик змінився,
-   * знімаємо старий рахунок і створюємо новий.
-   */
   async updatePayment(
     input: UpdatePaymentInput
   ): Promise<UpdatePaymentOutput> {
@@ -319,11 +276,6 @@ class MonobankPaymentProviderService extends AbstractPaymentProvider<Options> {
     return { data: initiated.data ?? {} }
   }
 
-  /**
-   * Вебхук Monobank прилітає на /hooks/payment/monobank_monobank.
-   * Підпис перевіряємо тим самим ECDSA, що й раніше; `reference` містить
-   * id сесії оплати, за яким Medusa знаходить платіж.
-   */
   async getWebhookActionAndData(
     payload: ProviderWebhookPayload["payload"]
   ): Promise<WebhookActionResult> {
@@ -345,7 +297,6 @@ class MonobankPaymentProviderService extends AbstractPaymentProvider<Options> {
     const sessionId = body?.reference
 
     if (!sessionId) {
-      // Рахунок створювали не через Medusa (напр. MonoPay-кнопка).
       return { action: "not_supported" }
     }
 
@@ -367,10 +318,6 @@ class MonobankPaymentProviderService extends AbstractPaymentProvider<Options> {
         return { action: "failed", data: { session_id: sessionId, amount } }
 
       case "reversed":
-        // Повернення завжди ініціює Medusa (кнопка Refund), і вона ж його
-        // фіксує. Реагувати тут "canceled" не можна: часткове повернення
-        // скасувало б увесь платіж. Логуємо на випадок повернення
-        // з кабінету Monobank повз Medusa.
         this.logger_.info(
           `[monobank] Рахунок ${body.invoiceId} повернуто (reversed), сума ${body.finalAmount ?? 0}`
         )
@@ -418,10 +365,6 @@ class MonobankPaymentProviderService extends AbstractPaymentProvider<Options> {
     }
   }
 
-  /**
-   * "debit" списує кошти одразу, тож success = captured. При "hold"
-   * success неможливий без finalize, тому там усе через authorized.
-   */
   private toSessionStatus(
     status: MonobankInvoiceStatus
   ): AuthorizePaymentOutput["status"] {
@@ -436,18 +379,10 @@ class MonobankPaymentProviderService extends AbstractPaymentProvider<Options> {
       case "expired":
         return "canceled"
       default:
-        // created / processing — користувач ще не завершив оплату.
         return "pending_authorization"
     }
   }
 
-  /**
-   * Medusa рахує в основних одиницях, Monobank — тільки в копійках.
-   *
-   * Сума приходить як BigNumberInput: подекуди це звичайне число, а з
-   * адмінки (refund) — сирий об'єкт `{ value: "10" }`. Через BigNumber
-   * коректно розбираються всі варіанти.
-   */
   private toMinorUnits(amount: BigNumberInput): number {
     let value: number
 

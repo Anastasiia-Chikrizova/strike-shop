@@ -14,13 +14,6 @@ type ProductListQueryParams = (HttpTypes.FindParams &
   option_value_id?: string | string[]
 }
 
-/**
- * Скільки секунд список товарів живе в кеші Next.
- *
- * Без цього вікна `force-cache` тримає відповідь вічно й скидається лише
- * за тегом, а тег скидають тільки дії у самому сторефронті. Через це
- * товар, доданий в адмінці, не з'являвся в магазині до перезапуску.
- */
 const PRODUCTS_REVALIDATE_SECONDS = toPositiveInt(
   process.env.PRODUCTS_REVALIDATE_SECONDS,
   60
@@ -111,10 +104,6 @@ export const listProducts = async ({
     })
 }
 
-/**
- * This will fetch 100 products to the Next.js cache and sort them based on the sortBy parameter.
- * It will then return the paginated products based on the page and limit parameters.
- */
 export const listProductsWithSort = async ({
   page = 0,
   queryParams,

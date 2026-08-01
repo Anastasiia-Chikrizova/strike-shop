@@ -4,13 +4,8 @@ const SCRIPT_ID = "monopay-script"
 const SCRIPT_SRC =
   "https://pay.monobank.ua/mono-pay-button/v1/mono-pay-button.js"
 
-/** Один проміс на всю сторінку: паралельні виклики не мають дублювати тег. */
 let loader: Promise<MonoPayInstance> | null = null
 
-/**
- * Вантажить скрипт віджета MonoPay і повертає window.MonoPay.
- * Повторні виклики віддають той самий проміс.
- */
 export function loadMonoPayScript(): Promise<MonoPayInstance> {
   if (typeof window === "undefined") {
     return Promise.reject(
@@ -39,7 +34,6 @@ export function loadMonoPayScript(): Promise<MonoPayInstance> {
     }
 
     const onError = () => {
-      // Скидаємо кеш, щоб наступна спроба справді перезавантажила скрипт.
       loader = null
       script.remove()
       reject(new Error("Не вдалося завантажити скрипт MonoPay"))

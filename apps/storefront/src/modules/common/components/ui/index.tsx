@@ -12,10 +12,8 @@ import {
 
 // TODO: Add Toaster component back when needed for notifications
 
-// Re-export clsx as clx for compatibility
 export { clsx as clx }
 
-// Text Component
 type TextProps = HTMLAttributes<HTMLParagraphElement> & {
   as?: "p" | "span" | "div"
 }
@@ -31,7 +29,6 @@ export const Text = forwardRef<HTMLParagraphElement, TextProps>(
 )
 Text.displayName = "Text"
 
-// Heading Component
 type HeadingProps = HTMLAttributes<HTMLHeadingElement> & {
   level?: "h1" | "h2" | "h3"
 }
@@ -57,7 +54,6 @@ export const Heading = forwardRef<HTMLHeadingElement, HeadingProps>(
 )
 Heading.displayName = "Heading"
 
-// Button Component
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: "primary" | "secondary" | "transparent"
   size?: "small" | "medium" | "large"
@@ -101,7 +97,6 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
 )
 Button.displayName = "Button"
 
-// Container Component
 type ContainerProps = HTMLAttributes<HTMLDivElement>
 
 export const Container = forwardRef<HTMLDivElement, ContainerProps>(
@@ -119,7 +114,6 @@ export const Container = forwardRef<HTMLDivElement, ContainerProps>(
 )
 Container.displayName = "Container"
 
-// Badge Component
 type BadgeProps = HTMLAttributes<HTMLSpanElement> & {
   color?: "green" | "red" | "blue" | "orange" | "grey" | "purple"
 }
@@ -148,7 +142,6 @@ export const Badge = forwardRef<HTMLSpanElement, BadgeProps>(
 )
 Badge.displayName = "Badge"
 
-// IconBadge Component
 type IconBadgeProps = HTMLAttributes<HTMLSpanElement>
 
 export const IconBadge = forwardRef<HTMLSpanElement, IconBadgeProps>(
@@ -169,7 +162,6 @@ export const IconBadge = forwardRef<HTMLSpanElement, IconBadgeProps>(
 )
 IconBadge.displayName = "IconBadge"
 
-// IconButton Component
 type IconButtonProps = ButtonHTMLAttributes<HTMLButtonElement>
 
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
@@ -190,7 +182,6 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
 )
 IconButton.displayName = "IconButton"
 
-// Label Component
 type LabelProps = LabelHTMLAttributes<HTMLLabelElement>
 
 export const Label = forwardRef<HTMLLabelElement, LabelProps>(
@@ -208,7 +199,6 @@ export const Label = forwardRef<HTMLLabelElement, LabelProps>(
 )
 Label.displayName = "Label"
 
-// Input Component
 type InputProps = InputHTMLAttributes<HTMLInputElement> & {
   label?: string
 }
@@ -232,7 +222,6 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
 )
 Input.displayName = "Input"
 
-// Table Components
 type TableProps = TableHTMLAttributes<HTMLTableElement>
 
 const TableRoot = forwardRef<HTMLTableElement, TableProps>(
@@ -353,7 +342,6 @@ export const Table = Object.assign(TableRoot, {
   Cell: TableCell,
 })
 
-// RadioGroup Components
 type RadioGroupProps = HTMLAttributes<HTMLDivElement>
 
 const RadioGroupRoot = forwardRef<HTMLDivElement, RadioGroupProps>(
@@ -400,7 +388,6 @@ export const RadioGroup = Object.assign(RadioGroupRoot, {
   Item: RadioGroupItem,
 })
 
-// Checkbox Component
 type CheckboxProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type"> & {
   label?: string
 }

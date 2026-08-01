@@ -1,67 +1,46 @@
-/**
- * Типи Monobank Acquiring API.
- * Докладніше: https://monobank.ua/api-docs/acquiring/
- *
- * Усі суми — у мінімальних одиницях валюти (копійках): 10000 === 100.00 грн.
- */
 
-/** ISO 4217. 980 — UAH (за замовчуванням), 840 — USD, 978 — EUR. */
 export const CCY_UAH = 980
 
 export type MonobankInvoiceStatus =
-  | "created" // рахунок створено, користувач ще не платив
-  | "processing" // оплата в обробці
-  | "hold" // кошти заблоковані (paymentType: "hold")
-  | "success" // успішна оплата
-  | "failure" // неуспішна оплата
-  | "reversed" // кошти повернуто (повністю або частково)
-  | "expired" // час життя рахунку вичерпано
+  | "created"
+  | "processing"
+  | "hold"
+  | "success"
+  | "failure"
+  | "reversed"
+  | "expired"
 
 export type MonobankPaymentType = "debit" | "hold"
 
 export type MonobankBasketItem = {
-  /** Назва товару */
   name: string
-  /** Кількість */
   qty: number
-  /** Вартість позиції в копійках (за всю кількість) */
   sum: number
-  /** Артикул / унікальний код товару */
   code: string
-  /** Посилання на зображення або base64 */
   icon?: string
-  /** Одиниця виміру, напр. "шт." */
   unit?: string
   barcode?: string
   header?: string
   footer?: string
-  /** Коди податкових ставок */
   tax?: number[]
   uktzed?: string
 }
 
 export type MonobankMerchantPaymInfo = {
-  /** Ваш ідентифікатор замовлення — повертається у вебхуці */
   reference?: string
-  /** Призначення платежу, показується користувачу */
   destination?: string
   comment?: string
   basketOrder?: MonobankBasketItem[]
 }
 
 export type CreateInvoiceInput = {
-  /** Сума в копійках */
   amount: number
   ccy?: number
   merchantPaymInfo?: MonobankMerchantPaymInfo
-  /** Куди повернути користувача після оплати (GET) */
   redirectUrl?: string
-  /** Куди Monobank надішле POST зі зміною статусу */
   webHookUrl?: string
-  /** Час життя рахунку в секундах, за замовчуванням 24 години */
   validity?: number
   paymentType?: MonobankPaymentType
-  /** true — у відповіді буде deeplink monobank:// */
   withAppUrl?: boolean
   saveCardData?: {
     saveCard: boolean
@@ -71,7 +50,6 @@ export type CreateInvoiceInput = {
 
 export type CreateInvoiceResponse = {
   invoiceId: string
-  /** Сторінка оплати — саме сюди перенаправляємо користувача */
   pageUrl: string
   appUrl?: string
 }
@@ -86,7 +64,6 @@ export type InvoiceStatusResponse = {
   modifiedDate?: string
   reference?: string
   destination?: string
-  /** Код помилки, якщо оплата не пройшла */
   errCode?: string
   failureReason?: string
   paymentInfo?: {
@@ -114,13 +91,8 @@ export type InvoiceStatusResponse = {
   }>
 }
 
-/** Тіло вебхука збігається зі структурою відповіді status. */
 export type MonobankWebhookPayload = InvoiceStatusResponse
 
-/**
- * Нормалізований результат для фронтенду, щоб не тягнути
- * сирі статуси Monobank у UI.
- */
 export type PaymentOutcome = "pending" | "paid" | "hold" | "failed" | "canceled"
 
 export function toPaymentOutcome(status: MonobankInvoiceStatus): PaymentOutcome {
@@ -134,7 +106,6 @@ export function toPaymentOutcome(status: MonobankInvoiceStatus): PaymentOutcome 
     case "reversed":
       return "canceled"
     case "expired":
-      // користувач не завершив оплату у відведений час — трактуємо як відміну
       return "canceled"
     default:
       return "pending"

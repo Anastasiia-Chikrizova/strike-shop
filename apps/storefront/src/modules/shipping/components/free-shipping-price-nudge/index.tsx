@@ -85,7 +85,6 @@ export default function ShippingPriceNudge({
     return
   }
 
-  // Check if any shipping options have a conditional price based on item_total
   const freeShippingPrice = shippingOptions
     .map((shippingOption) => {
       const calculatedPrice = shippingOption.calculated_price
@@ -94,9 +93,6 @@ export default function ShippingPriceNudge({
         return
       }
 
-      // Get all prices that are:
-      // 1. Currency code is same as the cart's
-      // 2. Have a rule that is set on item_total
       const validCurrencyPrices = shippingOption.prices.filter(
         (price) =>
           price.currency_code === cart.currency_code &&
@@ -115,8 +111,6 @@ export default function ShippingPriceNudge({
     })
     .flat(1)
     .filter(Boolean)
-    // We focus here entirely on free shipping, but this can be edited to handle multiple layers
-    // of reduced shipping prices.
     .find((price) => price?.amount === 0)
 
   if (!freeShippingPrice) {

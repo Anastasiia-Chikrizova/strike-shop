@@ -9,38 +9,26 @@ import { MonoPayUiOptions } from "types/monopay"
 
 import ErrorMessage from "../error-message"
 
-/** requestId живе 10 хвилин — оновлюємо дані за хвилину до кінця. */
 const REFRESH_MARGIN_SECONDS = 60
-/** Скільки разів перепитати бекенд, поки прийде вебхук. */
 const CONFIRM_ATTEMPTS = 15
 const CONFIRM_INTERVAL_MS = 2000
 
 type Status =
-  | "loading" // вантажимо скрипт і підпис
-  | "ready" // кнопка відмальована
-  | "processing" // користувач платить / чекаємо вебхук
+  | "loading"
+  | "ready"
+  | "processing"
   | "success"
   | "failed"
-  | "error" // зламалась сама інтеграція
+  | "error"
 
 type MonoPayButtonProps = {
   cartId?: string
-  /** Потрібен, щоб зібрати адресу сторінки повернення. */
   countryCode?: string
   ui?: MonoPayUiOptions
-  /** Викликається після ПІДТВЕРДЖЕНОЇ бекендом оплати. */
   onPaid?: (invoiceId: string) => void
-  /** Виконується до підпису замовлення — напр. підготовка кошика. */
   onBeforeInit?: () => Promise<void>
 }
 
-/**
- * Кнопка MonoPay: показує QR, який користувач сканує телефоном.
- * Є додаток monobank — відкриється він, немає — веб-версія.
- *
- * onSuccess віджета НЕ вважається підтвердженням: остаточний статус
- * питаємо в бекенда, який отримує його вебхуком від Monobank.
- */
 const MonoPayButton: React.FC<MonoPayButtonProps> = ({
   cartId,
   countryCode,
@@ -60,8 +48,6 @@ const MonoPayButton: React.FC<MonoPayButtonProps> = ({
     onBeforeInitRef.current = onBeforeInit
   }, [onPaid, onBeforeInit])
 
-  // Об'єкт ui з пропсів міняє ідентичність на кожен рендер, а перезапуск
-  // ефекту означав би перестворення кнопки. Порівнюємо за вмістом.
   const uiKey = useMemo(() => JSON.stringify(ui ?? {}), [ui])
 
   useEffect(() => {
@@ -69,7 +55,6 @@ const MonoPayButton: React.FC<MonoPayButtonProps> = ({
     let clicked = false
     let refreshTimer: ReturnType<typeof setTimeout> | null = null
 
-    /** Питаємо бекенд, поки він не побачить фінальний статус. */
     const confirmPayment = async (invoiceId: string) => {
       for (let attempt = 0; attempt < CONFIRM_ATTEMPTS; attempt++) {
         if (cancelled) {
@@ -98,14 +83,12 @@ const MonoPayButton: React.FC<MonoPayButtonProps> = ({
       }
 
       if (!cancelled) {
-        // Оплата могла пройти — просто вебхук ще в дорозі.
         setMessage(
           "Оплата ще підтверджується. Ми оновимо замовлення, щойно банк відповість."
         )
       }
     }
 
-    /** Перепідписуємо дані до того, як протухне requestId. */
     const scheduleRefresh = (expiresIn: number) => {
       if (refreshTimer) {
         clearTimeout(refreshTimer)
@@ -114,7 +97,6 @@ const MonoPayButton: React.FC<MonoPayButtonProps> = ({
       const delay = Math.max(expiresIn - REFRESH_MARGIN_SECONDS, 30) * 1000
 
       refreshTimer = setTimeout(async () => {
-        // Після кліку payloadBase64 і підпис міняти не можна.
         if (clicked || cancelled || !window.MonoPay) {
           return
         }
@@ -134,7 +116,6 @@ const MonoPayButton: React.FC<MonoPayButtonProps> = ({
 
           scheduleRefresh(fresh.expires_in)
         } catch {
-          // Не критично: користувач побачить помилку при кліку й перезавантажить сторінку.
         }
       }, delay)
     }
@@ -171,7 +152,6 @@ const MonoPayButton: React.FC<MonoPayButtonProps> = ({
               setMessage(null)
             },
             onInvoiceCreate: (invoice) => {
-              // Інвойс створено — далі користувач сканує QR.
               void confirmPayment(invoice.invoiceId)
             },
             onSuccess: (result) => {
