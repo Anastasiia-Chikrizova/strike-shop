@@ -25,13 +25,10 @@ RUN npm run build --workspace=@dtc/backend
 FROM node:22-alpine AS server-deps
 WORKDIR /app
 
-RUN apk add --no-cache python3 make g++
-
-COPY --from=builder /repo/apps/backend/.medusa/server/package.json ./
-
-RUN --mount=type=cache,target=/root/.npm npm install --omit=dev --no-audit --no-fund --prefer-offline
-
+COPY --from=deps /repo/node_modules ./node_modules
 COPY --from=builder /repo/apps/backend/.medusa/server ./
+
+RUN npm prune --omit=dev --no-audit --no-fund
 
 FROM node:22-alpine AS runner
 WORKDIR /app
