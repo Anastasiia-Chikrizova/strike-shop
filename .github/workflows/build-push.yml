@@ -28,6 +28,9 @@ jobs:
       backend_changed: ${{ steps.filter.outputs.backend }}
       storefront_changed: ${{ steps.filter.outputs.storefront }}
     steps:
+      - uses: actions/checkout@v7
+        if: github.event_name == 'push'
+
       - id: filter
         if: github.event_name == 'push'
         uses: dorny/paths-filter@v4
