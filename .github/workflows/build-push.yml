@@ -21,16 +21,14 @@ permissions:
 
 jobs:
   build:
-    # Ampere A1 в Oracle — це arm64. Збираємо нативно на arm-раннері:
-    # крос-збірка через QEMU задихається на нативних модулях бекенда.
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-24.04
 
     # Секрет STOREFRONT_ENV береться з GitHub Environment з такою ж назвою.
     environment: ${{ inputs.environment || (github.ref_name == 'master' && 'prod') || 'staging' }}
 
     env:
       APP_ENV: ${{ inputs.environment || (github.ref_name == 'master' && 'prod') || 'staging' }}
-      PLATFORM: linux/arm64
+      PLATFORM: linux/amd64
 
     steps:
       - uses: actions/checkout@v4
