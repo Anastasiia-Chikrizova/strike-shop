@@ -25,7 +25,23 @@ jobs:
     outputs:
       app_env: ${{ steps.vars.outputs.app_env }}
       img_prefix: ${{ steps.vars.outputs.img_prefix }}
+      backend_changed: ${{ steps.filter.outputs.backend }}
+      storefront_changed: ${{ steps.filter.outputs.storefront }}
     steps:
+      - id: filter
+        if: github.event_name == 'push'
+        uses: dorny/paths-filter@v4
+        with:
+          filters: |
+            backend:
+              - 'apps/backend/**'
+              - 'package.json'
+              - 'package-lock.json'
+            storefront:
+              - 'apps/storefront/**'
+              - 'package.json'
+              - 'package-lock.json'
+
       - id: vars
         run: |
           echo "app_env=${{ inputs.environment || (github.ref_name == 'master' && 'prod') || 'staging' }}" >> "$GITHUB_OUTPUT"
@@ -33,6 +49,7 @@ jobs:
 
   backend:
     needs: setup
+    if: github.event_name == 'workflow_dispatch' || needs.setup.outputs.backend_changed == 'true'
     runs-on: ubuntu-24.04
     environment: ${{ needs.setup.outputs.app_env }}
 
@@ -67,6 +84,7 @@ jobs:
 
   storefront:
     needs: setup
+    if: github.event_name == 'workflow_dispatch' || needs.setup.outputs.storefront_changed == 'true'
     runs-on: ubuntu-24.04
     environment: ${{ needs.setup.outputs.app_env }}
 
@@ -111,12 +129,21 @@ jobs:
 
   summary:
     needs: [setup, backend, storefront]
+    if: always()
     runs-on: ubuntu-24.04
     steps:
       - name: What was built
         run: |
           echo "### ${{ needs.setup.outputs.app_env }} → ${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
-          echo "${{ needs.setup.outputs.img_prefix }}/strike-backend:${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "${{ needs.setup.outputs.img_prefix }}/strike-storefront:${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
+          if [ "${{ needs.backend.result }}" = "success" ]; then
+            echo "${{ needs.setup.outputs.img_prefix }}/strike-backend:${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "backend: skipped, no changes under apps/backend" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ "${{ needs.storefront.result }}" = "success" ]; then
+            echo "${{ needs.setup.outputs.img_prefix }}/strike-storefront:${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "storefront: skipped, no changes under apps/storefront" >> "$GITHUB_STEP_SUMMARY"
+          fi
           echo '```' >> "$GITHUB_STEP_SUMMARY"
