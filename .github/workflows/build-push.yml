@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: Куди збирати
+        description: Target environment
         type: choice
         options: [staging, prod]
         default: staging
@@ -20,22 +20,28 @@ permissions:
   packages: write
 
 jobs:
-  build:
+  setup:
     runs-on: ubuntu-24.04
+    outputs:
+      app_env: ${{ steps.vars.outputs.app_env }}
+      img_prefix: ${{ steps.vars.outputs.img_prefix }}
+    steps:
+      - id: vars
+        run: |
+          echo "app_env=${{ inputs.environment || (github.ref_name == 'master' && 'prod') || 'staging' }}" >> "$GITHUB_OUTPUT"
+          echo "img_prefix=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
 
-    # Секрет STOREFRONT_ENV береться з GitHub Environment з такою ж назвою.
-    environment: ${{ inputs.environment || (github.ref_name == 'master' && 'prod') || 'staging' }}
+  backend:
+    needs: setup
+    runs-on: ubuntu-24.04
+    environment: ${{ needs.setup.outputs.app_env }}
 
     env:
-      APP_ENV: ${{ inputs.environment || (github.ref_name == 'master' && 'prod') || 'staging' }}
+      APP_ENV: ${{ needs.setup.outputs.app_env }}
       PLATFORM: linux/amd64
 
     steps:
       - uses: actions/checkout@v4
-
-      # GHCR приймає тільки нижній регістр, а owner у нас з великих літер.
-      - id: img
-        run: echo "prefix=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
 
       - uses: docker/login-action@v3
         with:
@@ -44,13 +50,6 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: docker/setup-buildx-action@v3
-
-      # NEXT_PUBLIC_* вшиваються в бандл на збірці, тому env сторфронта
-      # потрібен саме тут, а не на сервері.
-      - name: Викласти env сторфронта у файл
-        run: |
-          printf '%s' "${{ secrets.STOREFRONT_ENV }}" > /tmp/storefront.env
-          test -s /tmp/storefront.env
 
       - name: Backend
         uses: docker/build-push-action@v6
@@ -61,10 +60,34 @@ jobs:
           build-args: APP_ENV=${{ env.APP_ENV }}
           push: true
           tags: |
-            ${{ steps.img.outputs.prefix }}/strike-backend:${{ github.sha }}
-            ${{ steps.img.outputs.prefix }}/strike-backend:${{ env.APP_ENV }}
+            ${{ needs.setup.outputs.img_prefix }}/strike-backend:${{ github.sha }}
+            ${{ needs.setup.outputs.img_prefix }}/strike-backend:${{ env.APP_ENV }}
           cache-from: type=gha,scope=backend-${{ env.APP_ENV }}
           cache-to: type=gha,scope=backend-${{ env.APP_ENV }},mode=max
+
+  storefront:
+    needs: setup
+    runs-on: ubuntu-24.04
+    environment: ${{ needs.setup.outputs.app_env }}
+
+    env:
+      APP_ENV: ${{ needs.setup.outputs.app_env }}
+      PLATFORM: linux/amd64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/setup-buildx-action@v3
+      - name: Write storefront env to file
+        run: |
+          printf '%s' "${{ secrets.STOREFRONT_ENV }}" > /tmp/storefront.env
+          test -s /tmp/storefront.env
 
       - name: Storefront
         uses: docker/build-push-action@v6
@@ -77,19 +100,23 @@ jobs:
             app_env=/tmp/storefront.env
           push: true
           tags: |
-            ${{ steps.img.outputs.prefix }}/strike-storefront:${{ github.sha }}
-            ${{ steps.img.outputs.prefix }}/strike-storefront:${{ env.APP_ENV }}
+            ${{ needs.setup.outputs.img_prefix }}/strike-storefront:${{ github.sha }}
+            ${{ needs.setup.outputs.img_prefix }}/strike-storefront:${{ env.APP_ENV }}
           cache-from: type=gha,scope=storefront-${{ env.APP_ENV }}
           cache-to: type=gha,scope=storefront-${{ env.APP_ENV }},mode=max
 
-      - name: Прибрати env-файл
+      - name: Clean up env file
         if: always()
         run: rm -f /tmp/storefront.env
 
-      - name: Що зібрали
+  summary:
+    needs: [setup, backend, storefront]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: What was built
         run: |
-          echo "### ${{ env.APP_ENV }} → ${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "### ${{ needs.setup.outputs.app_env }} → ${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
-          echo "${{ steps.img.outputs.prefix }}/strike-backend:${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "${{ steps.img.outputs.prefix }}/strike-storefront:${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "${{ needs.setup.outputs.img_prefix }}/strike-backend:${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "${{ needs.setup.outputs.img_prefix }}/strike-storefront:${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"

@@ -17,7 +17,7 @@ WORKDIR /repo
 ENV NEXT_TELEMETRY_DISABLED=1
 
 COPY --from=deps /repo /repo
-COPY . .
+COPY apps/storefront apps/storefront
 
 RUN --mount=type=secret,id=app_env,target=/run/secrets/app_env \
     set -a; \
