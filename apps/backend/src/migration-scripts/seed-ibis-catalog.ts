@@ -1,264 +1,65 @@
 import { MedusaContainer } from "@medusajs/framework";
 import {
   ContainerRegistrationKeys,
-  ModuleRegistrationName,
-  Modules,
   ProductStatus,
 } from "@medusajs/framework/utils";
 import {
-  createApiKeysWorkflow,
-  createCollectionsWorkflow,
   createInventoryLevelsWorkflow,
   createProductCategoriesWorkflow,
   createProductOptionsWorkflow,
   createProductsWorkflow,
-  createRegionsWorkflow,
-  createSalesChannelsWorkflow,
-  createShippingOptionsWorkflow,
-  createShippingProfilesWorkflow,
-  createStockLocationsWorkflow,
-  createStoresWorkflow,
-  createTaxRegionsWorkflow,
-  linkSalesChannelsToApiKeyWorkflow,
-  linkSalesChannelsToStockLocationWorkflow,
+  deleteProductCategoriesWorkflow,
+  deleteProductsWorkflow,
 } from "@medusajs/medusa/core-flows";
 
-export default async function initial_data_seed({
+export default async function seed_ibis_catalog({
   container,
 }: {
   container: MedusaContainer;
 }) {
   const logger = container.resolve(ContainerRegistrationKeys.LOGGER);
-  const link = container.resolve(ContainerRegistrationKeys.LINK);
   const query = container.resolve(ContainerRegistrationKeys.QUERY);
-  const fulfillmentModuleService = container.resolve(
-    ModuleRegistrationName.FULFILLMENT
-  );
 
-  const countries = ["ua"];
+  logger.info("Removing demo Medusa catalog...");
 
-  logger.info("Seeding store data...");
-  const {
-    result: [defaultSalesChannel],
-  } = await createSalesChannelsWorkflow(container).run({
-    input: {
-      salesChannelsData: [
-        {
-          name: "Default Sales Channel",
-          description: "Created by Strike Shop",
-        },
-      ],
-    },
+  const demoHandles = ["t-shirt", "sweatshirt", "sweatpants", "shorts"];
+  const { data: demoProducts } = await query.graph({
+    entity: "product",
+    fields: ["id", "handle"],
+    filters: { handle: demoHandles },
   });
+  if (demoProducts.length) {
+    await deleteProductsWorkflow(container).run({
+      input: { ids: demoProducts.map((p) => p.id) },
+    });
+  }
 
-  const {
-    result: [publishableApiKey],
-  } = await createApiKeysWorkflow(container).run({
-    input: {
-      api_keys: [
-        {
-          title: "Default Publishable API Key",
-          type: "publishable",
-          created_by: "",
-        },
-      ],
-    },
+  const demoCategoryNames = ["Shirts", "Sweatshirts", "Pants", "Merch"];
+  const { data: demoCategories } = await query.graph({
+    entity: "product_category",
+    fields: ["id", "name"],
+    filters: { name: demoCategoryNames },
   });
+  if (demoCategories.length) {
+    await deleteProductCategoriesWorkflow(container).run({
+      input: demoCategories.map((c) => c.id),
+    });
+  }
+  logger.info("Finished removing demo Medusa catalog.");
 
-  await linkSalesChannelsToApiKeyWorkflow(container).run({
-    input: {
-      id: publishableApiKey.id,
-      add: [defaultSalesChannel.id],
-    },
+  const { data: salesChannels } = await query.graph({
+    entity: "sales_channel",
+    fields: ["id"],
   });
+  const defaultSalesChannel = salesChannels[0];
 
-  const {
-    result: [store],
-  } = await createStoresWorkflow(container).run({
-    input: {
-      stores: [
-        {
-          name: "Default Store",
-          supported_currencies: [
-            {
-              currency_code: "uah",
-              is_default: true,
-            },
-          ],
-          default_sales_channel_id: defaultSalesChannel.id,
-        },
-      ],
-    },
-  });
-
-  logger.info("Seeding region data...");
-  const { result: regionResult } = await createRegionsWorkflow(container).run({
-    input: {
-      regions: [
-        {
-          name: "Ukraine",
-          currency_code: "uah",
-          countries,
-          payment_providers: ["pp_system_default"],
-        },
-      ],
-    },
-  });
-  const region = regionResult[0];
-  logger.info("Finished seeding regions.");
-
-  logger.info("Seeding tax regions...");
-  await createTaxRegionsWorkflow(container).run({
-    input: countries.map((country_code) => ({
-      country_code,
-      provider_id: "tp_system",
-    })),
-  });
-  logger.info("Finished seeding tax regions.");
-
-  logger.info("Seeding stock location data...");
-  const { result: stockLocationResult } = await createStockLocationsWorkflow(
-    container
-  ).run({
-    input: {
-      locations: [
-        {
-          name: "Ukrainian Warehouse",
-          address: {
-            city: "Kyiv",
-            country_code: "UA",
-            address_1: "",
-          },
-        },
-      ],
-    },
-  });
-  const stockLocation = stockLocationResult[0];
-
-  await link.create({
-    [Modules.STOCK_LOCATION]: {
-      stock_location_id: stockLocation.id,
-    },
-    [Modules.FULFILLMENT]: {
-      fulfillment_provider_id: "manual_manual",
-    },
-  });
-
-  logger.info("Seeding fulfillment data...");
-  const { data: shippingProfileResult } = await query.graph({
+  const { data: shippingProfiles } = await query.graph({
     entity: "shipping_profile",
     fields: ["id"],
   });
-  const shippingProfile = shippingProfileResult[0];
+  const shippingProfile = shippingProfiles[0];
 
-  const fulfillmentSet = await fulfillmentModuleService.createFulfillmentSets({
-    name: "Ukrainian Warehouse delivery",
-    type: "shipping",
-    service_zones: [
-      {
-        name: "Ukraine",
-        geo_zones: [
-          {
-            country_code: "ua",
-            type: "country",
-          },
-        ],
-      },
-    ],
-  });
-
-  await link.create({
-    [Modules.STOCK_LOCATION]: {
-      stock_location_id: stockLocation.id,
-    },
-    [Modules.FULFILLMENT]: {
-      fulfillment_set_id: fulfillmentSet.id,
-    },
-  });
-
-  await createShippingOptionsWorkflow(container).run({
-    input: [
-      {
-        name: "Standard Shipping",
-        price_type: "flat",
-        provider_id: "manual_manual",
-        service_zone_id: fulfillmentSet.service_zones[0].id,
-        shipping_profile_id: shippingProfile.id,
-        type: {
-          label: "Standard",
-          description: "Ship in 2-3 days.",
-          code: "standard",
-        },
-        prices: [
-          {
-            currency_code: "uah",
-            amount: 10,
-          },
-          {
-            region_id: region.id,
-            amount: 10,
-          },
-        ],
-        rules: [
-          {
-            attribute: "enabled_in_store",
-            value: "true",
-            operator: "eq",
-          },
-          {
-            attribute: "is_return",
-            value: "false",
-            operator: "eq",
-          },
-        ],
-      },
-      {
-        name: "Express Shipping",
-        price_type: "flat",
-        provider_id: "manual_manual",
-        service_zone_id: fulfillmentSet.service_zones[0].id,
-        shipping_profile_id: shippingProfile.id,
-        type: {
-          label: "Express",
-          description: "Ship in 24 hours.",
-          code: "express",
-        },
-        prices: [
-          {
-            currency_code: "uah",
-            amount: 10,
-          },
-          {
-            region_id: region.id,
-            amount: 10,
-          },
-        ],
-        rules: [
-          {
-            attribute: "enabled_in_store",
-            value: "true",
-            operator: "eq",
-          },
-          {
-            attribute: "is_return",
-            value: "false",
-            operator: "eq",
-          },
-        ],
-      },
-    ],
-  });
-  logger.info("Finished seeding fulfillment data.");
-
-  await linkSalesChannelsToStockLocationWorkflow(container).run({
-    input: {
-      id: stockLocation.id,
-      add: [defaultSalesChannel.id],
-    },
-  });
-  logger.info("Finished seeding stock location data.");
-
-  logger.info("Seeding product data...");
+  logger.info("Seeding ІБІС product catalog...");
 
   const { result: categoryResult } = await createProductCategoriesWorkflow(
     container
@@ -324,6 +125,24 @@ export default async function initial_data_seed({
   const sizeOption = productOptionsResult.find((o) => o.title === "Розмір")!;
   const colorOption = productOptionsResult.find((o) => o.title === "Колір")!;
 
+  const newHandles = [
+    "howa-1500-hs-precision-308win",
+    "savage-110-ultralite-ss-308win",
+    "savage-impulse-big-game-308win",
+    "optima-invader-auto-pcp-45",
+    "umarex-glock-19-45bb",
+    "tasmanian-tiger-ifak-pouch-black",
+    "front-line-fl30-holster-pm",
+    "walkers-razor-carbon",
+    "norica-gun-case-133",
+    "defcon5-helmet-cover-fast-coyote",
+    "mechanix-original-m-olive",
+    "pentagon-orpheus-tshirts-m",
+    "defcon5-sniper-vest-pants-kit-m",
+    "pentagon-hybrid-2-shoes-41",
+    "aku-griffon-combat-gtx-7-brown",
+  ];
+
   await createProductsWorkflow(container).run({
     input: {
       products: [
@@ -333,7 +152,7 @@ export default async function initial_data_seed({
           category_ids: [weaponsCategory.id],
           description:
             "Болтова гвинтівка з алюмінієвим шасі HS Precision, ствол 22\", калібр .308 Win. Призначена для точної стрільби на середні дистанції.",
-          handle: "howa-1500-hs-precision-308win",
+          handle: newHandles[0],
           weight: 3800,
           status: ProductStatus.PUBLISHED,
           shipping_profile_id: shippingProfile.id,
@@ -353,7 +172,7 @@ export default async function initial_data_seed({
           category_ids: [weaponsCategory.id],
           description:
             'Полегшена болтова гвинтівка з карбоновим стволом та титановою ствольною коробкою, ствол 22", різьба 5/8"-24.',
-          handle: "savage-110-ultralite-ss-308win",
+          handle: newHandles[1],
           weight: 2900,
           status: ProductStatus.PUBLISHED,
           shipping_profile_id: shippingProfile.id,
@@ -373,7 +192,7 @@ export default async function initial_data_seed({
           category_ids: [weaponsCategory.id],
           description:
             'Гвинтівка з прямим ходом затвора (straight-pull) для швидкої повторної стрільби, ствол 22", різьба 5/8"-24.',
-          handle: "savage-impulse-big-game-308win",
+          handle: newHandles[2],
           weight: 3400,
           status: ProductStatus.PUBLISHED,
           shipping_profile_id: shippingProfile.id,
@@ -393,7 +212,7 @@ export default async function initial_data_seed({
           category_ids: [weaponsCategory.id],
           description:
             "Напівавтоматична PCP-гвинтівка калібру 4,5 мм з попереднім накачуванням повітря.",
-          handle: "optima-invader-auto-pcp-45",
+          handle: newHandles[3],
           weight: 3100,
           status: ProductStatus.PUBLISHED,
           shipping_profile_id: shippingProfile.id,
@@ -413,7 +232,7 @@ export default async function initial_data_seed({
           category_ids: [weaponsCategory.id],
           description:
             "Пневматичний пістолет-репліка Glock 19 калібру 4,5 мм ВВ із системою Blowback.",
-          handle: "umarex-glock-19-45bb",
+          handle: newHandles[4],
           weight: 650,
           status: ProductStatus.PUBLISHED,
           shipping_profile_id: shippingProfile.id,
@@ -434,7 +253,7 @@ export default async function initial_data_seed({
           category_ids: [gearCategory.id],
           description:
             "Медичний підсумок для розміщення аптечки першої допомоги (IFAK) з системою кріплення MOLLE.",
-          handle: "tasmanian-tiger-ifak-pouch-black",
+          handle: newHandles[5],
           weight: 200,
           status: ProductStatus.PUBLISHED,
           shipping_profile_id: shippingProfile.id,
@@ -454,7 +273,7 @@ export default async function initial_data_seed({
           category_ids: [gearCategory.id],
           description:
             "Поясна кобура для пістолета ПМ з фіксацією та зручним оперативним доступом.",
-          handle: "front-line-fl30-holster-pm",
+          handle: newHandles[6],
           weight: 150,
           status: ProductStatus.PUBLISHED,
           shipping_profile_id: shippingProfile.id,
@@ -474,7 +293,7 @@ export default async function initial_data_seed({
           category_ids: [gearCategory.id],
           description:
             "Активні навушники для захисту слуху з підсиленням навколишніх звуків та карбоновим корпусом.",
-          handle: "walkers-razor-carbon",
+          handle: newHandles[7],
           weight: 300,
           status: ProductStatus.PUBLISHED,
           shipping_profile_id: shippingProfile.id,
@@ -494,7 +313,7 @@ export default async function initial_data_seed({
           category_ids: [gearCategory.id],
           description:
             "Транспортувальний чохол для зброї довжиною 133 см з м'якою прокладкою.",
-          handle: "norica-gun-case-133",
+          handle: newHandles[8],
           weight: 900,
           status: ProductStatus.PUBLISHED,
           shipping_profile_id: shippingProfile.id,
@@ -514,7 +333,7 @@ export default async function initial_data_seed({
           category_ids: [gearCategory.id],
           description:
             "Кавер на шолом стандарту FAST з кріпленнями для додаткових аксесуарів.",
-          handle: "defcon5-helmet-cover-fast-coyote",
+          handle: newHandles[9],
           weight: 120,
           status: ProductStatus.PUBLISHED,
           shipping_profile_id: shippingProfile.id,
@@ -535,7 +354,7 @@ export default async function initial_data_seed({
           category_ids: [apparelCategory.id],
           description:
             "Тактичні рукавички з еластичними вставками та посиленою долонею для щоденного використання.",
-          handle: "mechanix-original-m-olive",
+          handle: newHandles[10],
           weight: 150,
           status: ProductStatus.PUBLISHED,
           shipping_profile_id: shippingProfile.id,
@@ -555,7 +374,7 @@ export default async function initial_data_seed({
           category_ids: [apparelCategory.id],
           description:
             "Комплект бавовняних футболок повсякденного крою, розмір M.",
-          handle: "pentagon-orpheus-tshirts-m",
+          handle: newHandles[11],
           weight: 450,
           status: ProductStatus.PUBLISHED,
           shipping_profile_id: shippingProfile.id,
@@ -587,7 +406,7 @@ export default async function initial_data_seed({
           category_ids: [apparelCategory.id],
           description:
             "Камуфльований костюм для маскування: жилет і штани, розмір M.",
-          handle: "defcon5-sniper-vest-pants-kit-m",
+          handle: newHandles[12],
           weight: 1200,
           status: ProductStatus.PUBLISHED,
           shipping_profile_id: shippingProfile.id,
@@ -607,7 +426,7 @@ export default async function initial_data_seed({
           category_ids: [apparelCategory.id],
           description:
             "Тактичні кросівки з дихаючим верхом та зносостійкою підошвою, розмір 41.",
-          handle: "pentagon-hybrid-2-shoes-41",
+          handle: newHandles[13],
           weight: 800,
           status: ProductStatus.PUBLISHED,
           shipping_profile_id: shippingProfile.id,
@@ -627,7 +446,7 @@ export default async function initial_data_seed({
           category_ids: [apparelCategory.id],
           description:
             "Бойові черевики з мембраною GORE-TEX для захисту від вологи, розмір 7 (US).",
-          handle: "aku-griffon-combat-gtx-7-brown",
+          handle: newHandles[14],
           weight: 1100,
           status: ProductStatus.PUBLISHED,
           shipping_profile_id: shippingProfile.id,
@@ -645,24 +464,37 @@ export default async function initial_data_seed({
       ],
     },
   });
-  logger.info("Finished seeding product data.");
+  logger.info("Finished seeding ІБІС product catalog.");
 
-  logger.info("Seeding inventory levels.");
+  logger.info("Seeding inventory levels for the new products...");
 
-  const { data: inventoryItems } = await query.graph({
-    entity: "inventory_item",
+  const { data: stockLocations } = await query.graph({
+    entity: "stock_location",
     fields: ["id"],
   });
+  const stockLocation = stockLocations[0];
+
+  const { data: newVariants } = await query.graph({
+    entity: "product_variant",
+    fields: ["id", "inventory_items.inventory_item_id"],
+    filters: { product: { handle: newHandles } },
+  });
+  const inventoryItemIds = newVariants.flatMap(
+    (variant) =>
+      variant.inventory_items
+        ?.filter((item): item is NonNullable<typeof item> => !!item)
+        .map((item) => item.inventory_item_id) ?? []
+  );
 
   await createInventoryLevelsWorkflow(container).run({
     input: {
-      inventory_levels: inventoryItems.map((item) => ({
+      inventory_levels: inventoryItemIds.map((inventoryItemId) => ({
         location_id: stockLocation.id,
         stocked_quantity: 1000000,
-        inventory_item_id: item.id,
+        inventory_item_id: inventoryItemId,
       })),
     },
   });
 
-  logger.info("Finished seeding inventory levels data.");
+  logger.info("Finished seeding inventory levels.");
 }
