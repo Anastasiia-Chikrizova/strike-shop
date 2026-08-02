@@ -10,7 +10,11 @@ http://{$BACKEND_DOMAIN} {
 
 	# Тіло вебхука перевіряється за сирими байтами — нічого не переписуємо.
 	reverse_proxy backend:9000 {
-		header_up X-Forwarded-Proto {scheme}
+		# {scheme} тут завжди "http" (реальний протокол Caddy↔cloudflared),
+		# а не той, яким реально йшов клієнт — той завжди https, бо термінується
+		# на Cloudflare Edge. Захардкожено, інакше бекенд думає, що з'єднання
+		# небезпечне, і ламає атрибути Secure/SameSite у куках сесії.
+		header_up X-Forwarded-Proto https
 		header_up X-Forwarded-Host {host}
 	}
 
@@ -25,7 +29,11 @@ http://{$STOREFRONT_DOMAIN} {
 	encode zstd gzip
 
 	reverse_proxy storefront:8000 {
-		header_up X-Forwarded-Proto {scheme}
+		# {scheme} тут завжди "http" (реальний протокол Caddy↔cloudflared),
+		# а не той, яким реально йшов клієнт — той завжди https, бо термінується
+		# на Cloudflare Edge. Захардкожено, інакше бекенд думає, що з'єднання
+		# небезпечне, і ламає атрибути Secure/SameSite у куках сесії.
+		header_up X-Forwarded-Proto https
 		header_up X-Forwarded-Host {host}
 	}
 
