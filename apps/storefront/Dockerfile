@@ -19,7 +19,10 @@ ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /repo /repo
 COPY apps/storefront apps/storefront
 
+ARG STOREFRONT_ENV_HASH
+
 RUN --mount=type=secret,id=app_env,target=/run/secrets/app_env \
+    echo "app_env hash: $STOREFRONT_ENV_HASH" && \
     set -a; \
     [ -f /run/secrets/app_env ] && . /run/secrets/app_env; \
     set +a; \
