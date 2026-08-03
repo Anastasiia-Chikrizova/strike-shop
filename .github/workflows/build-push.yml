@@ -2,7 +2,7 @@ name: build & push to GHCR
 
 on:
   push:
-    branches: [dev, master]
+    branches: [dev, main]
   workflow_dispatch:
     inputs:
       environment:
@@ -47,7 +47,7 @@ jobs:
 
       - id: vars
         run: |
-          echo "app_env=${{ inputs.environment || (github.ref_name == 'master' && 'prod') || 'staging' }}" >> "$GITHUB_OUTPUT"
+          echo "app_env=${{ inputs.environment || (github.ref_name == 'main' && 'prod') || 'staging' }}" >> "$GITHUB_OUTPUT"
           echo "img_prefix=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
 
   backend:

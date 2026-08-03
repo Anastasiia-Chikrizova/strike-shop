@@ -44,14 +44,18 @@ export default function CategoryTemplate({
       className="flex flex-col small:flex-row small:items-start py-6 content-container"
       data-testid="category-container"
     >
-      <RefinementList sortBy={sort} data-testid="sort-by-container" />
+      <RefinementList
+        sortBy={sort}
+        data-testid="sort-by-container"
+        categoryId={category.id}
+      />
       <div className="w-full">
         <div className="flex flex-row mb-8 text-2xl-semi gap-4">
           {parents &&
             parents.map((parent) => (
               <span key={parent.id} className="text-ui-fg-subtle">
                 <LocalizedClientLink
-                  className="mr-4 hover:text-black"
+                  className="mr-4 hover:text-ui-fg-base"
                   href={`/categories/${parent.handle}`}
                   data-testid="sort-by-link"
                 >
