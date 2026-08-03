@@ -10,6 +10,7 @@ import {
   createProductsWorkflow,
   deleteProductCategoriesWorkflow,
   deleteProductsWorkflow,
+  deleteReservationsWorkflow,
 } from "@medusajs/medusa/core-flows";
 
 export default async function seed_ibis_catalog({
@@ -28,7 +29,36 @@ export default async function seed_ibis_catalog({
     fields: ["id", "handle"],
     filters: { handle: demoHandles },
   });
+
   if (demoProducts.length) {
+    const { data: demoVariants } = await query.graph({
+      entity: "product_variant",
+      fields: ["id", "inventory_items.inventory_item_id"],
+      filters: { product: { handle: demoHandles } },
+    });
+    const demoInventoryItemIds = demoVariants.flatMap(
+      (variant) =>
+        variant.inventory_items
+          ?.filter((item): item is NonNullable<typeof item> => !!item)
+          .map((item) => item.inventory_item_id) ?? []
+    );
+
+    if (demoInventoryItemIds.length) {
+      const { data: demoReservations } = await query.graph({
+        entity: "reservation_item",
+        fields: ["id"],
+        filters: { inventory_item_id: demoInventoryItemIds },
+      });
+      if (demoReservations.length) {
+        logger.info(
+          `Releasing ${demoReservations.length} leftover reservation(s) on demo inventory...`
+        );
+        await deleteReservationsWorkflow(container).run({
+          input: { ids: demoReservations.map((r) => r.id) },
+        });
+      }
+    }
+
     await deleteProductsWorkflow(container).run({
       input: { ids: demoProducts.map((p) => p.id) },
     });
