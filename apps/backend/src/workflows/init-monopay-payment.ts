@@ -21,12 +21,6 @@ export type InitMonoPayPaymentInput = {
   validity?: number
 }
 
-/**
- * Рахуємо суму → підписуємо payload → зберігаємо очікуваний платіж.
- *
- * invoice_id тут ще невідомий: інвойс створює віджет у браузері.
- * Запис знаходимо по reference, коли прийде вебхук.
- */
 export const initMonoPayPaymentWorkflow = createWorkflow(
   "init-mono-pay-payment",
   function (input: InitMonoPayPaymentInput) {

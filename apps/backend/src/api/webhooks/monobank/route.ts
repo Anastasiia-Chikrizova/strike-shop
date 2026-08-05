@@ -9,19 +9,6 @@ import { verifyMonobankSignature } from "../../../lib/monobank/webhook"
 import { applyMonobankWebhookWorkflow } from "../../../workflows/apply-monobank-webhook"
 import { logMonobankWebhookWorkflow } from "../../../workflows/log-monobank-webhook"
 
-/**
- * POST /webhooks/monobank
- *
- * Monobank шле сюди POST при кожній зміні статусу рахунку.
- * Це — єдине джерело правди про оплату: сторінці повернення довіряти не можна,
- * користувач може закрити вкладку або підмінити URL.
- *
- * Будь-яка відповідь, крім 2xx, змушує Monobank повторити доставку —
- * тому 200 віддаємо тільки коли стан справді записано в БД.
- *
- * Сирий body для перевірки підпису вмикається в
- * src/api/webhooks/monobank/middlewares.ts (`preserveRawBody: true`).
- */
 export async function POST(req: MedusaRequest, res: MedusaResponse) {
   const logger = req.scope.resolve(ContainerRegistrationKeys.LOGGER)
 
@@ -72,8 +59,6 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
           `[monobank] Пропущено застарілий вебхук для ${payload.invoiceId}`
         )
       } else {
-        // Бізнес-логіку виносимо в підписників (src/subscribers), щоб не
-        // тримати Monobank у стані очікування.
         const eventBus = req.scope.resolve(Modules.EVENT_BUS)
 
         await eventBus.emit({
@@ -93,7 +78,6 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
         })
       }
     } catch (e) {
-      // Стан не записано — віддаємо 500, щоб Monobank прислав вебхук ще раз.
       httpStatus = 500
       error = (e as Error).message
       logger.error(
@@ -116,7 +100,6 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       },
     })
   } catch (e) {
-    // Якщо не пишеться навіть лог — БД недоступна, просимо ретрай.
     httpStatus = 500
     error = (e as Error).message
     logger.error(`[monobank] Не вдалося записати лог вебхука: ${error}`)

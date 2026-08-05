@@ -20,7 +20,6 @@ export type ApplyMonobankWebhookInput = {
 export type ApplyMonobankWebhookOutput = {
   id: string
   applied: boolean
-  /** true, якщо рахунку не було в БД і ми створили його з даних вебхука. */
   created: boolean
 }
 
@@ -35,12 +34,6 @@ type Snapshot = {
   invoice_id: string | null
 } | null
 
-/**
- * Ідемпотентно оновлює стан рахунку.
- *
- * Monobank повторює доставку вебхуків і не гарантує порядок, тому
- * оновлення застосовується лише якщо modifiedDate новіший за збережений.
- */
 export const applyMonobankWebhookStep = createStep(
   "apply-monobank-webhook",
   async (
@@ -52,7 +45,6 @@ export const applyMonobankWebhookStep = createStep(
     const existing = await findInvoice(service, input)
 
     if (!existing) {
-      // Рахунок створювали не ми (або запис загубився) — не втрачаємо факт оплати.
       const [created] = await service.createMonobankInvoices([
         {
           invoice_id: input.invoice_id,
@@ -135,7 +127,6 @@ async function findInvoice(
     return undefined
   }
 
-  // MonoPay: запис створено на етапі підпису, коли invoiceId ще не існував.
   const byReference = await service.listMonobankInvoices({
     reference: input.reference,
   })
@@ -143,7 +134,6 @@ async function findInvoice(
   return byReference.find((row) => !row.invoice_id) ?? byReference[0]
 }
 
-/** Вебхук вважається застарілим, якщо його modifiedDate не новіший за наш. */
 function isStale(current: Date | null, incoming?: string): boolean {
   if (!current || !incoming) {
     return false

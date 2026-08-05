@@ -1,155 +1,159 @@
 # Monobank Acquiring + MonoPay
 
-Оплата в чекауті йде через **платіжний провайдер Medusa**
-(`src/modules/monobank-payment`). Це означає, що Medusa веде життєвий цикл
-платежу сама: сесія оплати створює рахунок, `cart.complete()` перевіряє його
-статус у Monobank, а кнопки **Capture** і **Refund** в адмінці ходять
-у справжній Monobank.
+Checkout payment goes through a **Medusa payment provider**
+(`src/modules/monobank-payment`). That means Medusa itself drives the
+payment lifecycle: the payment session creates an invoice, `cart.complete()`
+checks its status with Monobank, and the **Capture** and **Refund** buttons
+in the admin talk to real Monobank.
 
-| Метод провайдера | Що робить у Monobank |
+| Provider method | What it does in Monobank |
 | --- | --- |
-| `initiatePayment` | `invoice/create` → `page_url` потрапляє в `data` сесії |
-| `authorizePayment` | `invoice/status` → `success` = **captured** (при `debit`) |
+| `initiatePayment` | `invoice/create` → `page_url` goes into the session `data` |
+| `authorizePayment` | `invoice/status` → `success` = **captured** (for `debit`) |
 | `capturePayment` | `debit` — no-op; `hold` — `invoice/finalize` |
-| `refundPayment` | `invoice/cancel` (підтримує часткове повернення) |
-| `cancelPayment` | неоплачений — `invoice/remove`, оплачений — `invoice/cancel` |
-| `getWebhookActionAndData` | перевірка `x-sign` → `captured` / `authorized` / `failed` |
+| `refundPayment` | `invoice/cancel` (supports partial refunds) |
+| `cancelPayment` | unpaid → `invoice/remove`, paid → `invoice/cancel` |
+| `getWebhookActionAndData` | verifies `x-sign` → `captured` / `authorized` / `failed` |
 
-Поруч живуть дві додаткові схеми:
+There are two additional schemes alongside it:
 
-| | **Invoice API (свої роути)** | **MonoPay** |
+| | **Invoice API (own routes)** | **MonoPay** |
 | --- | --- | --- |
-| Хто створює інвойс | бекенд | віджет у браузері |
-| Автентифікація | `X-Token` | наш ECDSA-підпис + `keyId` |
-| UX | redirect на сторінку Monobank | QR-код → застосунок monobank |
-| Ключі | не потрібні | пара P-256, публічний імпортується в Monobank |
+| Who creates the invoice | the backend | the widget in the browser |
+| Authentication | `X-Token` | our ECDSA signature + `keyId` |
+| UX | redirect to a Monobank page | QR code → monobank app |
+| Keys | none needed | a P-256 pair, public key imported into Monobank |
 
-## Файли
+## Files
 
-**Бібліотека**
+**Library**
 
-| Шлях | Що робить |
+| Path | What it does |
 | --- | --- |
-| `src/lib/monobank/client.ts` | HTTP-клієнт: invoice create/status/cancel/remove, pubkey, MonoPay pubkey import/list/delete |
-| `src/lib/monobank/webhook.ts` | перевірка ECDSA-підпису вебхука + кеш публічного ключа |
-| `src/lib/monobank/monopay.ts` | підпис payload для віджета, кеш `keyId`, читання приватного ключа |
-| `src/lib/monobank/types.ts` | типи API + мапінг статусів у `pending / paid / hold / failed / canceled` |
+| `src/lib/monobank/client.ts` | HTTP client: invoice create/status/cancel/remove, pubkey, MonoPay pubkey import/list/delete |
+| `src/lib/monobank/webhook.ts` | verifies the webhook's ECDSA signature + caches the public key |
+| `src/lib/monobank/monopay.ts` | signs the widget payload, caches `keyId`, reads the private key |
+| `src/lib/monobank/types.ts` | API types + status mapping to `pending / paid / hold / failed / canceled` |
 
-**Модуль (БД)**
+**Module (DB)**
 
-| Модель | Навіщо |
+| Model | Purpose |
 | --- | --- |
-| `monobank_invoice` | стан платежу: `invoice_id`, `request_id`, `reference`, `cart_id`, сума, статус, `modified_date` |
-| `monobank_webhook_log` | кожен вхідний вебхук — разом із сирим тілом і тими, що не пройшли підпис |
+| `monobank_invoice` | payment state: `invoice_id`, `request_id`, `reference`, `cart_id`, amount, status, `modified_date` |
+| `monobank_webhook_log` | every incoming webhook — including the raw body and ones that failed signature verification |
 
-**Воркфлоу**
+**Workflows**
 
-| Воркфлоу | Кроки |
+| Workflow | Steps |
 | --- | --- |
-| `create-monobank-invoice` | сума з кошика → створення рахунку в Monobank → запис у БД |
-| `init-mono-pay-payment` | сума з кошика → підпис payload → запис очікуваного платежу |
-| `apply-monobank-webhook` | ідемпотентне оновлення статусу за `modifiedDate` |
-| `log-monobank-webhook` | запис у лог |
+| `create-monobank-invoice` | cart total → create invoice in Monobank → write to DB |
+| `init-mono-pay-payment` | cart total → sign payload → record the expected payment |
+| `apply-monobank-webhook` | idempotent status update keyed on `modifiedDate` |
+| `log-monobank-webhook` | write to the log |
 
-**Роути**
+**Routes**
 
-| Метод | Шлях | Опис |
+| Method | Path | Description |
 | --- | --- | --- |
-| POST | `/store/monobank/payments` | створити рахунок, повертає `page_url` |
-| GET | `/store/monobank/payments/:invoiceId` | статус платежу |
-| POST | `/store/monobank/monopay/init` | `keyId`, `signature`, `requestId`, `payloadBase64` для віджета |
-| POST | `/hooks/payment/monobank_monobank` | **вебхук провайдера** — вбудований роут Medusa |
-| POST | `/webhooks/monobank` | вебхук для власного флоу (сирий body в `middlewares.ts`) |
+| POST | `/store/monobank/payments` | create an invoice, returns `page_url` |
+| GET | `/store/monobank/payments/:invoiceId` | payment status |
+| POST | `/store/monobank/monopay/init` | `keyId`, `signature`, `requestId`, `payloadBase64` for the widget |
+| POST | `/hooks/payment/monobank_monobank` | **provider webhook** — Medusa's built-in route |
+| POST | `/webhooks/monobank` | webhook for the custom flow (raw body in `middlewares.ts`) |
 
-**Фронтенд:** `lib/data/monobank.ts`, `lib/data/monopay.ts`,
-`lib/util/load-monopay-script.ts`, компоненти `monobank-payment-button`,
-`monopay-button`, `monopay-status-poller`, сторінка `monobank/return`.
+**Frontend:** `lib/data/monobank.ts`, `lib/data/monopay.ts`,
+`lib/util/load-monopay-script.ts`, the `monobank-payment-button`,
+`monopay-button`, `monopay-status-poller` components, and the
+`monobank/return` page.
 
-## Змінні оточення (`apps/backend/.env`)
+## Environment variables (`apps/backend/.env`)
 
 ```
 MONO_KEY=uJhxxxxxxxxxxxxxxxxxx
 MONO_API_URL=https://api.monobank.ua
-MONO_WEBHOOK_URL=https://<публічний-домен>/webhooks/monobank
+MONO_WEBHOOK_URL=https://<public-domain>/webhooks/monobank
 MONO_REDIRECT_URL=http://localhost:8000/ua/monobank/return
-# MONO_ALLOW_CLIENT_AMOUNT=true   # лише для тестів, див. нижче
+# MONO_ALLOW_CLIENT_AMOUNT=true   # testing only, see below
 
-# тільки для MonoPay
+# MonoPay only
 MONOPAY_PRIVATE_KEY=<base64(PEM) ECDSA P-256>
 # MONOPAY_KEY_ID=pk_test_…
 ```
 
-Тестовий токен: https://api.monobank.ua/. Бойовий — у кабінеті мерчанта.
+Sandbox token: https://api.monobank.ua/. Production token is in the merchant
+dashboard.
 
-## Налаштування MonoPay (одноразово)
+## Setting up MonoPay (one-time)
 
 ```bash
-npx medusa exec ./src/scripts/monopay-keys.ts generate   # друкує пару ключів
-# покласти MONOPAY_PRIVATE_KEY у .env
-npx medusa exec ./src/scripts/monopay-keys.ts import     # вантажить публічний у Monobank
-npx medusa exec ./src/scripts/monopay-keys.ts list       # показує keyId
+npx medusa exec ./src/scripts/monopay-keys.ts generate   # prints a key pair
+# put MONOPAY_PRIVATE_KEY into .env
+npx medusa exec ./src/scripts/monopay-keys.ts import     # uploads the public key to Monobank
+npx medusa exec ./src/scripts/monopay-keys.ts list       # shows the keyId
 ```
 
-`generate` нічого нікуди не надсилає — тільки друкує. Приватний ключ живе
-виключно в `.env` бекенда.
+`generate` doesn't send anything anywhere — it only prints. The private key
+lives only in the backend's `.env`.
 
-## Як рахується підпис MonoPay
+## How the MonoPay signature is computed
 
 ```
 signature = base64( DER( ECDSA-P256-SHA256( JSON.stringify(payload) + requestId ) ) )
-payloadBase64 = base64( той самий JSON )
+payloadBase64 = base64( that same JSON )
 ```
 
-JSON серіалізується **рівно один раз** — і підпис, і `payloadBase64`
-робляться з одного рядка. Дві окремі серіалізації колись розійдуться
-(порядок ключів, пробіли), і Monobank відхилить підпис.
+The JSON is serialized **exactly once** — both the signature and
+`payloadBase64` are built from the same string. Two separate serializations
+would eventually drift (key order, whitespace), and Monobank would reject the
+signature.
 
-`crypto.createSign("SHA256")` хешує сам — окремо рахувати SHA-256 і підписувати
-дайджест не можна, вийде подвійний хеш.
+`crypto.createSign("SHA256")` hashes internally — don't hash with SHA-256
+separately and sign the digest, that would double-hash it.
 
-## Чому сума рахується на сервері
+## Why the amount is computed on the server
 
-`amount` із клієнта означає, що будь-хто оплатить замовлення за 1 копійку.
-Явний `amount` приймається лише при `MONO_ALLOW_CLIENT_AMOUNT=true` —
-режим для локальних експериментів.
+An `amount` coming from the client would mean anyone could pay for an order
+with one kopeck. An explicit `amount` is only accepted when
+`MONO_ALLOW_CLIENT_AMOUNT=true` — a mode for local experimentation only.
 
-## Вебхук
+## Webhook
 
-- підпис перевіряється від **сирих байтів** тіла (`preserveRawBody`);
-- 401 — невалідний підпис, 400 — тіло без `invoiceId`/`status`,
-  500 — не вдалося записати в БД. Будь-що, крім 2xx, змушує Monobank
-  повторити доставку;
-- 200 віддається лише після успішного запису;
-- застарілі вебхуки (`modifiedDate` не новіший за збережений) ігноруються,
-  щоб ретрай не відкотив `success` назад у `processing`;
-- після успішного оновлення емітиться подія
-  `monobank.invoice.{paid|hold|failed|canceled|pending}` — вішайте на неї
-  підписників у `src/subscribers`.
+- the signature is verified against the **raw bytes** of the body
+  (`preserveRawBody`);
+- 401 — invalid signature, 400 — body missing `invoiceId`/`status`,
+  500 — failed to write to the DB. Anything other than 2xx makes Monobank
+  retry delivery;
+- 200 is only returned after a successful write;
+- stale webhooks (`modifiedDate` not newer than what's stored) are ignored,
+  so a retry can't roll `success` back to `processing`;
+- after a successful update, a `monobank.invoice.{paid|hold|failed|canceled|pending}`
+  event is emitted — attach subscribers to it in `src/subscribers`.
 
-## Локальне тестування вебхука
+## Testing the webhook locally
 
 ```bash
 ngrok http 9000
 ```
 
-Далі `MONO_WEBHOOK_URL=https://<id>.ngrok.io/webhooks/monobank` і рестарт бекенду.
+Then set `MONO_WEBHOOK_URL=https://<id>.ngrok.io/webhooks/monobank` and
+restart the backend.
 
-## Увімкнути провайдер у регіоні
+## Enabling the provider for a region
 
-Провайдер зареєстровано в `medusa-config.ts`, але кожному регіону його треба
-дозволити окремо:
+The provider is registered in `medusa-config.ts`, but each region needs it
+enabled separately:
 
 ```bash
 npx medusa exec ./src/scripts/enable-monobank-provider.ts
 ```
 
-Те саме руками: Admin → Settings → Regions → Payment providers.
+Or manually: Admin → Settings → Regions → Payment providers.
 
-## Що лишилось поза інтеграцією
+## What's deliberately not covered by the integration
 
-- **`hold`.** При `MONO_PAYMENT_TYPE=hold` кошти блокуються, і списати
-  (`invoice/finalize`) або повернути їх треба протягом 9 днів. Capture в
-  адмінці робить саме finalize.
-- **MonoPay-кнопка** живе поза провайдером: інвойс створює віджет, тому
-  її вебхуки приходять на `/webhooks/monobank` і оновлюють лише таблицю
-  `monobank_invoice`, не чіпаючи payment collection.
+- **`hold`.** With `MONO_PAYMENT_TYPE=hold`, funds are blocked, and they must
+  be captured (`invoice/finalize`) or released within 9 days. Capture in the
+  admin does exactly that finalize call.
+- **The MonoPay button** lives outside the provider: the invoice is created
+  by the widget, so its webhooks land on `/webhooks/monobank` and only update
+  the `monobank_invoice` table, without touching the payment collection.

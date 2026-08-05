@@ -5,7 +5,6 @@ import { sdk } from "@lib/config"
 import { getAuthHeaders, getCartId } from "./cookies"
 import { getOrigin } from "./monobank"
 
-/** Дані для window.MonoPay.init(). Живуть 10 хвилин. */
 export type MonoPayInitData = {
   keyId: string
   signature: string
@@ -17,10 +16,6 @@ export type MonoPayInitData = {
   expires_in: number
 }
 
-/**
- * Просить бекенд підписати замовлення для кнопки MonoPay.
- * Приватний ключ живе тільки на бекенді — сюди приїжджає лише підпис.
- */
 export async function initMonoPay(input?: {
   cartId?: string
   countryCode?: string

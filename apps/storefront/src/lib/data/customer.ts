@@ -25,9 +25,6 @@ export type CustomerAuthState =
   | { state: "success" }
   | null
 
-// Requests a verification email for the given customer. The request must be
-// authenticated with a token tied to the auth identity (the token returned by
-// register or by a login that requires verification).
 async function requestVerificationEmail(email: string, token: string) {
   await sdk.auth.verification.request(
     {
@@ -103,9 +100,6 @@ export async function signup(
     })
   } catch (error) {
     const fetchError = error as FetchError
-    // An existing identity (for example, an admin user with the same email) is
-    // expected and handled: the customer can still log in to link a customer
-    // record. Any other error is surfaced.
     if (
       fetchError.statusText !== "Unauthorized" ||
       fetchError.message !== "Identity with email already exists"
@@ -114,13 +108,8 @@ export async function signup(
     }
   }
 
-  // Persist the extra signup fields. The customer record is created during
-  // login, which is deferred until after email verification when the backend
-  // requires it.
   await setPendingCustomer(customerForm)
 
-  // Continue by logging in. The login response tells us whether the backend
-  // requires email verification — we don't need a storefront-side flag.
   return completeLogin(customerForm.email, password)
 }
 
@@ -134,9 +123,6 @@ export async function login(
   return completeLogin(email, password)
 }
 
-// Logs the customer in and reconciles the customer record. The behavior is
-// driven entirely by the backend's login response, so it works whether or not
-// email verification is enabled.
 async function completeLogin(
   email: string,
   password: string
@@ -149,8 +135,6 @@ async function completeLogin(
     return { state: "error", error: String(error) }
   }
 
-  // A `location` is returned by third-party auth providers, which this flow
-  // doesn't support.
   if (typeof result === "object" && "location" in result) {
     return {
       state: "error",
@@ -158,8 +142,6 @@ async function completeLogin(
     }
   }
 
-  // The backend requires email verification and the customer hasn't verified
-  // yet. Send the verification email and ask them to check their inbox.
   if (
     typeof result === "object" &&
     "verification_required" in result &&
@@ -168,7 +150,6 @@ async function completeLogin(
     try {
       await requestVerificationEmail(email, result.token)
     } catch {
-      // Ignore: the customer can resend from the verification page.
     }
     return { state: "verification_required", email }
   }
@@ -182,11 +163,6 @@ async function completeLogin(
 
   let token = result
 
-  // The token may not be tied to a customer record yet — right after
-  // registration, or after verifying a brand-new account. Ask the backend:
-  // `/store/customers/me` rejects tokens without a registered actor, so a
-  // failed retrieve means we still need to create the customer, then log in
-  // again to obtain a customer-bound token.
   const customerExists = await sdk.store.customer
     .retrieve({}, { authorization: `Bearer ${token}` })
     .then(() => true)
@@ -232,10 +208,6 @@ async function completeLogin(
   return { state: "success" }
 }
 
-// Confirms a customer's email using the token from the verification link.
-//
-// The confirm route doesn't require authentication, so this works even when the
-// customer opens the link on a different device than the one they signed up on.
 export async function confirmEmailVerification(
   token: string
 ): Promise<{ success: boolean; error?: string }> {

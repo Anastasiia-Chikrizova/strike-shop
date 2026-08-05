@@ -7,13 +7,6 @@ import { HttpTypes } from "@medusajs/types"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useCallback } from "react"
 
-/**
- * Крок оплати.
- *
- * Єдиний спосіб оплати — monobank. Ручний провайдер Medusa лишається
- * під капотом: cart.complete() вимагає payment collection, тому сесія
- * створюється мовчки перед переходом на сторінку оплати.
- */
 const Payment = ({
   cart,
   availablePaymentMethods,
@@ -59,7 +52,7 @@ const Payment = ({
   }
 
   return (
-    <div className="bg-white">
+    <div className="bg-ui-bg-base">
       <div className="flex flex-row items-center justify-between mb-6">
         <Heading
           level="h2"
@@ -103,12 +96,6 @@ const Payment = ({
           ) : (
             <MonobankCheckout
               cart={cart}
-              /*
-                Свідомо не звіряємось із availablePaymentMethods: цей список
-                кешується, і після вмикання провайдера в регіоні кнопка
-                лишалась би заблокованою. Якщо провайдер не увімкнено,
-                Medusa поверне зрозумілу помилку при створенні сесії.
-              */
               notReady={(cart.shipping_methods?.length ?? 0) === 0}
             />
           )}

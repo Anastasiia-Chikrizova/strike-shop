@@ -2,7 +2,6 @@ import { MedusaError } from "@medusajs/framework/utils"
 
 import { MonobankError } from "./client"
 
-/** Перетворює помилку Monobank у помилку Medusa з коректним HTTP-кодом. */
 export function toMedusaError(e: unknown): Error {
   if (e instanceof MonobankError) {
     const type =

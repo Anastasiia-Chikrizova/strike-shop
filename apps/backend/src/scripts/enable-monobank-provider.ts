@@ -6,14 +6,6 @@ import {
 
 const PROVIDER_ID = "pp_monobank_monobank"
 
-/**
- * Вмикає провайдер Monobank у регіонах.
- *
- *   npx medusa exec ./src/scripts/enable-monobank-provider.ts        # усі регіони
- *   npx medusa exec ./src/scripts/enable-monobank-provider.ts reg_01…  # конкретний
- *
- * Те саме можна зробити руками: Admin → Settings → Regions → Payment providers.
- */
 export default async function enableMonobankProvider({
   args,
   container,

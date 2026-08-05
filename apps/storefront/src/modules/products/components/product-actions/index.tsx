@@ -40,7 +40,6 @@ export default function ProductActions({
   const [isAdding, setIsAdding] = useState(false)
   const countryCode = useParams().countryCode as string
 
-  // If there is only 1 variant, preselect the options
   useEffect(() => {
     if (product.variants?.length === 1) {
       const variantOptions = optionsAsKeymap(product.variants[0].options)
@@ -59,7 +58,6 @@ export default function ProductActions({
     })
   }, [product.variants, options])
 
-  // update the options when a variant is selected
   const setOptionValue = (optionId: string, value: string) => {
     setOptions((prev) => ({
       ...prev,
@@ -67,7 +65,6 @@ export default function ProductActions({
     }))
   }
 
-  //check if the selected options produce a valid variant
   const isValidVariant = useMemo(() => {
     return product.variants?.some((v) => {
       const variantOptions = optionsAsKeymap(v.options)
@@ -92,19 +89,15 @@ export default function ProductActions({
     router.replace(pathname + "?" + params.toString())
   }, [selectedVariant, isValidVariant])
 
-  // check if the selected variant is in stock
   const inStock = useMemo(() => {
-    // If we don't manage inventory, we can always add to cart
     if (selectedVariant && !selectedVariant.manage_inventory) {
       return true
     }
 
-    // If we allow back orders on the variant, we can add to cart
     if (selectedVariant?.allow_backorder) {
       return true
     }
 
-    // If there is inventory available, we can add to cart
     if (
       selectedVariant?.manage_inventory &&
       (selectedVariant?.inventory_quantity || 0) > 0
@@ -112,7 +105,6 @@ export default function ProductActions({
       return true
     }
 
-    // Otherwise, we can't add to cart
     return false
   }, [selectedVariant])
 
@@ -120,7 +112,6 @@ export default function ProductActions({
 
   const inView = useIntersection(actionsRef, "0px")
 
-  // add the selected variant to the cart
   const handleAddToCart = async () => {
     if (!selectedVariant?.id) return null
 

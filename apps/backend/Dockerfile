@@ -7,16 +7,17 @@ RUN apk add --no-cache python3 make g++
 
 COPY package.json package-lock.json ./
 COPY apps/backend/package.json apps/backend/
-COPY apps/storefront/package.json apps/storefront/
 
-RUN --mount=type=cache,target=/root/.npm npm ci
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --workspace=@dtc/backend --include-workspace-root --no-audit --no-fund
 
 FROM node:22-alpine AS builder
 WORKDIR /repo
 
 RUN apk add --no-cache python3 make g++
 
-COPY . .
+COPY package.json package-lock.json ./
+COPY apps/backend apps/backend
 COPY --from=deps /repo/node_modules ./node_modules
 
 RUN npm run build --workspace=@dtc/backend
@@ -24,11 +25,10 @@ RUN npm run build --workspace=@dtc/backend
 FROM node:22-alpine AS server-deps
 WORKDIR /app
 
-RUN apk add --no-cache python3 make g++
-
+COPY --from=deps /repo/node_modules ./node_modules
 COPY --from=builder /repo/apps/backend/.medusa/server ./
 
-RUN --mount=type=cache,target=/root/.npm npm install --omit=dev
+RUN npm prune --omit=dev --no-audit --no-fund
 
 FROM node:22-alpine AS runner
 WORKDIR /app

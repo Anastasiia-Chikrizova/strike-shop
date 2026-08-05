@@ -8,7 +8,6 @@ import {
   LogMonobankWebhookInput,
 } from "./steps/log-monobank-webhook"
 
-/** Окремий воркфлоу: лог пишеться і тоді, коли обробка вебхука впала. */
 export const logMonobankWebhookWorkflow = createWorkflow(
   "log-monobank-webhook",
   function (input: LogMonobankWebhookInput) {

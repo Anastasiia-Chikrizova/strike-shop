@@ -12,12 +12,6 @@ type MonobankCheckoutProps = {
   notReady?: boolean
 }
 
-/**
- * Єдиний спосіб оплати в чекауті.
- *
- * Сесію оплати створює платіжний провайдер Monobank у Medusa, тому окремо
- * готувати кошик не треба: cart.complete() сам перевірить статус рахунку.
- */
 const MonobankCheckout: React.FC<MonobankCheckoutProps> = ({
   cart,
   notReady,

@@ -6,17 +6,6 @@ import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { monobank } from "../lib/monobank/client"
 import { loadPrivateKey } from "../lib/monobank/monopay"
 
-/**
- * Керування ключами підпису MonoPay.
- *
- *   npx medusa exec ./src/scripts/monopay-keys.ts list
- *   npx medusa exec ./src/scripts/monopay-keys.ts generate
- *   npx medusa exec ./src/scripts/monopay-keys.ts import
- *   npx medusa exec ./src/scripts/monopay-keys.ts delete <keyId>
- *
- * `generate` тільки друкує пару — нічого нікуди не надсилає.
- * `import` бере публічну частину з MONOPAY_PRIVATE_KEY і вантажить у Monobank.
- */
 export default async function monopayKeys({ args, container }: ExecArgs) {
   const logger = container.resolve(ContainerRegistrationKeys.LOGGER)
   const [command = "list", argument] = args
