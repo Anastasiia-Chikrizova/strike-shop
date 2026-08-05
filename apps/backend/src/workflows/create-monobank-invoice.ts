@@ -21,11 +21,6 @@ export type CreateMonobankInvoiceInput = {
   payment_type?: MonobankPaymentType
 }
 
-/**
- * Рахуємо суму → створюємо рахунок у Monobank → зберігаємо його в БД.
- * Якщо запис у БД впаде, компенсація зніме рахунок у Monobank, щоб не
- * лишалося посилань на оплату, про які ми нічого не знаємо.
- */
 export const createMonobankInvoiceWorkflow = createWorkflow(
   "create-monobank-invoice",
   function (input: CreateMonobankInvoiceInput) {

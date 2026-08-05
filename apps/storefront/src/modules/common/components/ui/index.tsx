@@ -12,10 +12,8 @@ import {
 
 // TODO: Add Toaster component back when needed for notifications
 
-// Re-export clsx as clx for compatibility
 export { clsx as clx }
 
-// Text Component
 type TextProps = HTMLAttributes<HTMLParagraphElement> & {
   as?: "p" | "span" | "div"
 }
@@ -31,7 +29,6 @@ export const Text = forwardRef<HTMLParagraphElement, TextProps>(
 )
 Text.displayName = "Text"
 
-// Heading Component
 type HeadingProps = HTMLAttributes<HTMLHeadingElement> & {
   level?: "h1" | "h2" | "h3"
 }
@@ -57,7 +54,6 @@ export const Heading = forwardRef<HTMLHeadingElement, HeadingProps>(
 )
 Heading.displayName = "Heading"
 
-// Button Component
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: "primary" | "secondary" | "transparent"
   size?: "small" | "medium" | "large"
@@ -83,10 +79,11 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         disabled={disabled || isLoading}
         className={clsx(
           "inline-flex gap-2 items-center justify-center rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
-          variant === "primary" && "bg-black text-white hover:bg-gray-800",
+          variant === "primary" &&
+            "bg-ui-fg-base text-ui-bg-base hover:bg-ui-fg-subtle",
           variant === "secondary" &&
-            "bg-white text-black border border-gray-200 hover:bg-gray-50",
-          variant === "transparent" && "bg-transparent hover:bg-gray-100",
+            "bg-ui-bg-base text-ui-fg-base border border-ui-border-base hover:bg-ui-bg-subtle",
+          variant === "transparent" && "bg-transparent hover:bg-ui-bg-subtle",
           size === "small" && "h-8 px-3 text-sm",
           size === "medium" && "h-10 px-4",
           size === "large" && "h-12 px-6 text-lg",
@@ -101,7 +98,6 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
 )
 Button.displayName = "Button"
 
-// Container Component
 type ContainerProps = HTMLAttributes<HTMLDivElement>
 
 export const Container = forwardRef<HTMLDivElement, ContainerProps>(
@@ -109,7 +105,7 @@ export const Container = forwardRef<HTMLDivElement, ContainerProps>(
     return (
       <div
         ref={ref}
-        className={clsx("bg-white rounded-lg p-4", className)}
+        className={clsx("bg-ui-bg-base rounded-lg p-4", className)}
         {...props}
       >
         {children}
@@ -119,7 +115,6 @@ export const Container = forwardRef<HTMLDivElement, ContainerProps>(
 )
 Container.displayName = "Container"
 
-// Badge Component
 type BadgeProps = HTMLAttributes<HTMLSpanElement> & {
   color?: "green" | "red" | "blue" | "orange" | "grey" | "purple"
 }
@@ -148,7 +143,6 @@ export const Badge = forwardRef<HTMLSpanElement, BadgeProps>(
 )
 Badge.displayName = "Badge"
 
-// IconBadge Component
 type IconBadgeProps = HTMLAttributes<HTMLSpanElement>
 
 export const IconBadge = forwardRef<HTMLSpanElement, IconBadgeProps>(
@@ -157,7 +151,7 @@ export const IconBadge = forwardRef<HTMLSpanElement, IconBadgeProps>(
       <span
         ref={ref}
         className={clsx(
-          "inline-flex items-center justify-center rounded-full bg-gray-100 p-1",
+          "inline-flex items-center justify-center rounded-full bg-ui-bg-subtle p-1",
           className
         )}
         {...props}
@@ -169,7 +163,6 @@ export const IconBadge = forwardRef<HTMLSpanElement, IconBadgeProps>(
 )
 IconBadge.displayName = "IconBadge"
 
-// IconButton Component
 type IconButtonProps = ButtonHTMLAttributes<HTMLButtonElement>
 
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
@@ -190,7 +183,6 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
 )
 IconButton.displayName = "IconButton"
 
-// Label Component
 type LabelProps = LabelHTMLAttributes<HTMLLabelElement>
 
 export const Label = forwardRef<HTMLLabelElement, LabelProps>(
@@ -208,7 +200,6 @@ export const Label = forwardRef<HTMLLabelElement, LabelProps>(
 )
 Label.displayName = "Label"
 
-// Input Component
 type InputProps = InputHTMLAttributes<HTMLInputElement> & {
   label?: string
 }
@@ -221,7 +212,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         <input
           ref={ref}
           className={clsx(
-            "flex h-10 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+            "flex h-10 w-full rounded-md border border-ui-border-base bg-ui-bg-base px-3 py-2 text-sm placeholder:text-ui-fg-muted focus:outline-none focus:ring-2 focus:ring-ui-border-interactive focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
             className
           )}
           {...props}
@@ -232,7 +223,6 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
 )
 Input.displayName = "Input"
 
-// Table Components
 type TableProps = TableHTMLAttributes<HTMLTableElement>
 
 const TableRoot = forwardRef<HTMLTableElement, TableProps>(
@@ -353,7 +343,6 @@ export const Table = Object.assign(TableRoot, {
   Cell: TableCell,
 })
 
-// RadioGroup Components
 type RadioGroupProps = HTMLAttributes<HTMLDivElement>
 
 const RadioGroupRoot = forwardRef<HTMLDivElement, RadioGroupProps>(
@@ -400,7 +389,6 @@ export const RadioGroup = Object.assign(RadioGroupRoot, {
   Item: RadioGroupItem,
 })
 
-// Checkbox Component
 type CheckboxProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type"> & {
   label?: string
 }

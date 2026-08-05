@@ -1,0 +1,44 @@
+# TLS термінується на Cloudflare Edge (тунель шле сюди вже голий HTTP на
+# :80), тому Caddy тут HTTPS не піднімає — інакше він сам редиректить
+# HTTP→HTTPS, а Cloudflare знову шле HTTP, і виходить нескінченний редирект
+# (перевірено на практиці: ERR_TOO_MANY_REDIRECTS).
+# Домени підставляються з env (див. deploy/stack.env.example).
+
+# Бекенд: Store API, адмінка на /app, вебхук монобанку на /webhooks/monobank.
+http://{$BACKEND_DOMAIN} {
+	encode zstd gzip
+
+	# Тіло вебхука перевіряється за сирими байтами — нічого не переписуємо.
+	reverse_proxy backend:9000 {
+		# {scheme} тут завжди "http" (реальний протокол Caddy↔cloudflared),
+		# а не той, яким реально йшов клієнт — той завжди https, бо термінується
+		# на Cloudflare Edge. Захардкожено, інакше бекенд думає, що з'єднання
+		# небезпечне, і ламає атрибути Secure/SameSite у куках сесії.
+		header_up X-Forwarded-Proto https
+		header_up X-Forwarded-Host {host}
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}
+
+# Сторфронт.
+http://{$STOREFRONT_DOMAIN} {
+	encode zstd gzip
+
+	reverse_proxy storefront:8000 {
+		# {scheme} тут завжди "http" (реальний протокол Caddy↔cloudflared),
+		# а не той, яким реально йшов клієнт — той завжди https, бо термінується
+		# на Cloudflare Edge. Захардкожено, інакше бекенд думає, що з'єднання
+		# небезпечне, і ламає атрибути Secure/SameSite у куках сесії.
+		header_up X-Forwarded-Proto https
+		header_up X-Forwarded-Host {host}
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

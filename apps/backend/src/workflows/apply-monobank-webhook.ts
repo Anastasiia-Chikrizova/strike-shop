@@ -8,7 +8,6 @@ import {
   ApplyMonobankWebhookInput,
 } from "./steps/apply-monobank-webhook"
 
-/** Застосовує стан із перевіреного вебхука до нашої БД. */
 export const applyMonobankWebhookWorkflow = createWorkflow(
   "apply-monobank-webhook",
   function (input: ApplyMonobankWebhookInput) {

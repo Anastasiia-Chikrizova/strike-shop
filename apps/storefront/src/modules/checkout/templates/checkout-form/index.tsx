@@ -29,10 +29,7 @@ export default async function CheckoutForm({
 
       <Shipping cart={cart} availableShippingMethods={shippingMethods} />
 
-      {/*
-        Кроку Review більше немає: оплата через monobank і є фінальною дією,
-        а замовлення оформлюється автоматично після підтвердження банком.
-      */}
+      {}
       <Payment cart={cart} availablePaymentMethods={paymentMethods} />
     </div>
   )

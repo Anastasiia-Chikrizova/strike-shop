@@ -42,10 +42,6 @@ type LanguageSelectProps = {
   currentLocale: string | null
 }
 
-/**
- * Gets the localized display name for a language code using Intl API.
- * Falls back to the provided name if Intl is unavailable.
- */
 const getLocalizedLanguageName = (
   code: string,
   fallbackName: string,
@@ -156,7 +152,7 @@ const LanguageSelect = ({
             leaveTo="opacity-0"
           >
             <ListboxOptions
-              className="absolute -bottom-[calc(100%-36px)] left-0 xsmall:left-auto xsmall:right-0 max-h-[442px] overflow-y-scroll z-[900] bg-white drop-shadow-md text-small-regular uppercase text-black no-scrollbar rounded-rounded w-full"
+              className="absolute -bottom-[calc(100%-36px)] left-0 xsmall:left-auto xsmall:right-0 max-h-[442px] overflow-y-scroll z-[900] bg-ui-bg-base drop-shadow-md text-small-regular uppercase text-ui-fg-base no-scrollbar rounded-rounded w-full"
               static
             >
               {options.map((o) => (

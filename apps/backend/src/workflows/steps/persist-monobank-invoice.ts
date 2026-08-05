@@ -14,7 +14,6 @@ export type PersistMonobankInvoiceInput = {
   cart_id?: string
 }
 
-/** Зберігає рахунок у нашій БД, щоб вебхук потім мав що оновлювати. */
 export const persistMonobankInvoiceStep = createStep(
   "persist-monobank-invoice",
   async (input: PersistMonobankInvoiceInput, { container }) => {

@@ -145,7 +145,6 @@ export default async function initial_data_seed({
   });
 
   logger.info("Seeding fulfillment data...");
-  // This is created by a migration script in core.
   const { data: shippingProfileResult } = await query.graph({
     entity: "shipping_profile",
     fields: ["id"],
@@ -267,24 +266,28 @@ export default async function initial_data_seed({
     input: {
       product_categories: [
         {
-          name: "Shirts",
+          name: "Зброя",
           is_active: true,
         },
         {
-          name: "Sweatshirts",
+          name: "Спорядження",
           is_active: true,
         },
         {
-          name: "Pants",
-          is_active: true,
-        },
-        {
-          name: "Merch",
+          name: "Одяг та взуття",
           is_active: true,
         },
       ],
     },
   });
+
+  const weaponsCategory = categoryResult.find((cat) => cat.name === "Зброя")!;
+  const gearCategory = categoryResult.find(
+    (cat) => cat.name === "Спорядження"
+  )!;
+  const apparelCategory = categoryResult.find(
+    (cat) => cat.name === "Одяг та взуття"
+  )!;
 
   const { result: productOptionsResult } = await createProductOptionsWorkflow(
     container
@@ -292,410 +295,352 @@ export default async function initial_data_seed({
     input: {
       product_options: [
         {
-          title: "Size",
-          values: ["S", "M", "L", "XL"],
+          title: "Калібр",
+          values: [".308 Win", "4,5 мм"],
         },
         {
-          title: "Color",
-          values: ["Black", "White"],
+          title: "Розмір",
+          values: ["M", "41", "7"],
+        },
+        {
+          title: "Колір",
+          values: [
+            "Чорний",
+            "Койот",
+            "Olive Drab",
+            "Білий",
+            "Синій",
+            "Камуфляж",
+            "Сірий",
+            "Brown",
+          ],
         },
       ],
     },
   });
-  const sizeOption = productOptionsResult.find((o) => o.title === "Size")!;
-  const colorOption = productOptionsResult.find((o) => o.title === "Color")!;
+  const caliberOption = productOptionsResult.find(
+    (o) => o.title === "Калібр"
+  )!;
+  const sizeOption = productOptionsResult.find((o) => o.title === "Розмір")!;
+  const colorOption = productOptionsResult.find((o) => o.title === "Колір")!;
 
   await createProductsWorkflow(container).run({
     input: {
       products: [
+        // Зброя
         {
-          title: "Medusa T-Shirt",
-          category_ids: [
-            categoryResult.find((cat) => cat.name === "Shirts")!.id,
-          ],
+          title: "Карабін Howa 1500 HS Precision",
+          category_ids: [weaponsCategory.id],
           description:
-            "Reimagine the feeling of a classic T-shirt. With our cotton T-shirts, everyday essentials no longer have to be ordinary.",
-          handle: "t-shirt",
-          weight: 400,
+            "Болтова гвинтівка з алюмінієвим шасі HS Precision, ствол 22\", калібр .308 Win. Призначена для точної стрільби на середні дистанції.",
+          handle: "howa-1500-hs-precision-308win",
+          weight: 3800,
           status: ProductStatus.PUBLISHED,
           shipping_profile_id: shippingProfile.id,
-          images: [
-            {
-              url: "https://medusa-public-images.s3.eu-west-1.amazonaws.com/tee-black-front.png",
-            },
-            {
-              url: "https://medusa-public-images.s3.eu-west-1.amazonaws.com/tee-black-back.png",
-            },
-            {
-              url: "https://medusa-public-images.s3.eu-west-1.amazonaws.com/tee-white-front.png",
-            },
-            {
-              url: "https://medusa-public-images.s3.eu-west-1.amazonaws.com/tee-white-back.png",
-            },
-          ],
-          options: [
-            { id: sizeOption.id },
-            { id: colorOption.id },
-          ],
+          options: [{ id: caliberOption.id }],
           variants: [
             {
-              title: "S / Black",
-              sku: "SHIRT-S-BLACK",
-              options: {
-                Size: "S",
-                Color: "Black",
-              },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "uah",
-                },
-              ],
-            },
-            {
-              title: "S / White",
-              sku: "SHIRT-S-WHITE",
-              options: {
-                Size: "S",
-                Color: "White",
-              },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "uah",
-                },
-              ],
-            },
-            {
-              title: "M / Black",
-              sku: "SHIRT-M-BLACK",
-              options: {
-                Size: "M",
-                Color: "Black",
-              },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "uah",
-                },
-              ],
-            },
-            {
-              title: "M / White",
-              sku: "SHIRT-M-WHITE",
-              options: {
-                Size: "M",
-                Color: "White",
-              },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "uah",
-                },
-              ],
-            },
-            {
-              title: "L / Black",
-              sku: "SHIRT-L-BLACK",
-              options: {
-                Size: "L",
-                Color: "Black",
-              },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "uah",
-                },
-              ],
-            },
-            {
-              title: "L / White",
-              sku: "SHIRT-L-WHITE",
-              options: {
-                Size: "L",
-                Color: "White",
-              },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "uah",
-                },
-              ],
-            },
-            {
-              title: "XL / Black",
-              sku: "SHIRT-XL-BLACK",
-              options: {
-                Size: "XL",
-                Color: "Black",
-              },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "uah",
-                },
-              ],
-            },
-            {
-              title: "XL / White",
-              sku: "SHIRT-XL-WHITE",
-              options: {
-                Size: "XL",
-                Color: "White",
-              },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "uah",
-                },
-              ],
+              title: ".308 Win",
+              sku: "IBIS-HOWA1500-308",
+              options: { Калібр: ".308 Win" },
+              prices: [{ amount: 62930, currency_code: "uah" }],
             },
           ],
-          sales_channels: [
-            {
-              id: defaultSalesChannel.id,
-            },
-          ],
+          sales_channels: [{ id: defaultSalesChannel.id }],
         },
         {
-          title: "Medusa Sweatshirt",
-          category_ids: [
-            categoryResult.find((cat) => cat.name === "Sweatshirts")!.id,
-          ],
+          title: "Карабін Savage 110 Ultralite SS",
+          category_ids: [weaponsCategory.id],
           description:
-            "Reimagine the feeling of a classic sweatshirt. With our cotton sweatshirt, everyday essentials no longer have to be ordinary.",
-          handle: "sweatshirt",
-          weight: 400,
+            'Полегшена болтова гвинтівка з карбоновим стволом та титановою ствольною коробкою, ствол 22", різьба 5/8"-24.',
+          handle: "savage-110-ultralite-ss-308win",
+          weight: 2900,
           status: ProductStatus.PUBLISHED,
           shipping_profile_id: shippingProfile.id,
-          images: [
-            {
-              url: "https://medusa-public-images.s3.eu-west-1.amazonaws.com/sweatshirt-vintage-front.png",
-            },
-            {
-              url: "https://medusa-public-images.s3.eu-west-1.amazonaws.com/sweatshirt-vintage-back.png",
-            },
-          ],
-          options: [{ id: sizeOption.id }],
+          options: [{ id: caliberOption.id }],
           variants: [
             {
-              title: "S",
-              sku: "SWEATSHIRT-S",
-              options: {
-                Size: "S",
-              },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "uah",
-                },
-              ],
-            },
-            {
-              title: "M",
-              sku: "SWEATSHIRT-M",
-              options: {
-                Size: "M",
-              },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "uah",
-                },
-              ],
-            },
-            {
-              title: "L",
-              sku: "SWEATSHIRT-L",
-              options: {
-                Size: "L",
-              },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "uah",
-                },
-              ],
-            },
-            {
-              title: "XL",
-              sku: "SWEATSHIRT-XL",
-              options: {
-                Size: "XL",
-              },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "uah",
-                },
-              ],
+              title: ".308 Win",
+              sku: "IBIS-SAV110-308",
+              options: { Калібр: ".308 Win" },
+              prices: [{ amount: 70500, currency_code: "uah" }],
             },
           ],
-          sales_channels: [
-            {
-              id: defaultSalesChannel.id,
-            },
-          ],
+          sales_channels: [{ id: defaultSalesChannel.id }],
         },
         {
-          title: "Medusa Sweatpants",
-          category_ids: [
-            categoryResult.find((cat) => cat.name === "Pants")!.id,
-          ],
+          title: "Карабін Savage Impulse Big Game",
+          category_ids: [weaponsCategory.id],
           description:
-            "Reimagine the feeling of classic sweatpants. With our cotton sweatpants, everyday essentials no longer have to be ordinary.",
-          handle: "sweatpants",
-          weight: 400,
+            'Гвинтівка з прямим ходом затвора (straight-pull) для швидкої повторної стрільби, ствол 22", різьба 5/8"-24.',
+          handle: "savage-impulse-big-game-308win",
+          weight: 3400,
           status: ProductStatus.PUBLISHED,
           shipping_profile_id: shippingProfile.id,
-          images: [
-            {
-              url: "https://medusa-public-images.s3.eu-west-1.amazonaws.com/sweatpants-gray-front.png",
-            },
-            {
-              url: "https://medusa-public-images.s3.eu-west-1.amazonaws.com/sweatpants-gray-back.png",
-            },
-          ],
-          options: [{ id: sizeOption.id }],
+          options: [{ id: caliberOption.id }],
           variants: [
             {
-              title: "S",
-              sku: "SWEATPANTS-S",
-              options: {
-                Size: "S",
-              },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "uah",
-                },
-              ],
-            },
-            {
-              title: "M",
-              sku: "SWEATPANTS-M",
-              options: {
-                Size: "M",
-              },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "uah",
-                },
-              ],
-            },
-            {
-              title: "L",
-              sku: "SWEATPANTS-L",
-              options: {
-                Size: "L",
-              },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "uah",
-                },
-              ],
-            },
-            {
-              title: "XL",
-              sku: "SWEATPANTS-XL",
-              options: {
-                Size: "XL",
-              },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "uah",
-                },
-              ],
+              title: ".308 Win",
+              sku: "IBIS-SAVIMP-308",
+              options: { Калібр: ".308 Win" },
+              prices: [{ amount: 64860, currency_code: "uah" }],
             },
           ],
-          sales_channels: [
-            {
-              id: defaultSalesChannel.id,
-            },
-          ],
+          sales_channels: [{ id: defaultSalesChannel.id }],
         },
         {
-          title: "Medusa Shorts",
-          category_ids: [
-            categoryResult.find((cat) => cat.name === "Merch")!.id,
-          ],
+          title: "Гвинтівка пневматична Optima Invader Auto PCP",
+          category_ids: [weaponsCategory.id],
           description:
-            "Reimagine the feeling of classic shorts. With our cotton shorts, everyday essentials no longer have to be ordinary.",
-          handle: "shorts",
-          weight: 400,
+            "Напівавтоматична PCP-гвинтівка калібру 4,5 мм з попереднім накачуванням повітря.",
+          handle: "optima-invader-auto-pcp-45",
+          weight: 3100,
           status: ProductStatus.PUBLISHED,
           shipping_profile_id: shippingProfile.id,
-          images: [
-            {
-              url: "https://medusa-public-images.s3.eu-west-1.amazonaws.com/shorts-vintage-front.png",
-            },
-            {
-              url: "https://medusa-public-images.s3.eu-west-1.amazonaws.com/shorts-vintage-back.png",
-            },
-          ],
-          options: [{ id: sizeOption.id }],
+          options: [{ id: caliberOption.id }],
           variants: [
             {
-              title: "S",
-              sku: "SHORTS-S",
-              options: {
-                Size: "S",
-              },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "uah",
-                },
-              ],
-            },
-            {
-              title: "M",
-              sku: "SHORTS-M",
-              options: {
-                Size: "M",
-              },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "uah",
-                },
-              ],
-            },
-            {
-              title: "L",
-              sku: "SHORTS-L",
-              options: {
-                Size: "L",
-              },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "uah",
-                },
-              ],
-            },
-            {
-              title: "XL",
-              sku: "SHORTS-XL",
-              options: {
-                Size: "XL",
-              },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "uah",
-                },
-              ],
+              title: "4,5 мм",
+              sku: "IBIS-OPTINV-45",
+              options: { Калібр: "4,5 мм" },
+              prices: [{ amount: 19180, currency_code: "uah" }],
             },
           ],
-          sales_channels: [
+          sales_channels: [{ id: defaultSalesChannel.id }],
+        },
+        {
+          title: "Пістолет пневматичний Umarex Glock 19",
+          category_ids: [weaponsCategory.id],
+          description:
+            "Пневматичний пістолет-репліка Glock 19 калібру 4,5 мм ВВ із системою Blowback.",
+          handle: "umarex-glock-19-45bb",
+          weight: 650,
+          status: ProductStatus.PUBLISHED,
+          shipping_profile_id: shippingProfile.id,
+          options: [{ id: caliberOption.id }],
+          variants: [
             {
-              id: defaultSalesChannel.id,
+              title: "4,5 мм",
+              sku: "IBIS-UMGLOCK19-45",
+              options: { Калібр: "4,5 мм" },
+              prices: [{ amount: 6530, currency_code: "uah" }],
             },
           ],
+          sales_channels: [{ id: defaultSalesChannel.id }],
+        },
+        // Спорядження
+        {
+          title: "Підсумок Tasmanian Tiger IFAK Pouch",
+          category_ids: [gearCategory.id],
+          description:
+            "Медичний підсумок для розміщення аптечки першої допомоги (IFAK) з системою кріплення MOLLE.",
+          handle: "tasmanian-tiger-ifak-pouch-black",
+          weight: 200,
+          status: ProductStatus.PUBLISHED,
+          shipping_profile_id: shippingProfile.id,
+          options: [{ id: colorOption.id }],
+          variants: [
+            {
+              title: "Чорний",
+              sku: "IBIS-TT-IFAK-BLK",
+              options: { Колір: "Чорний" },
+              prices: [{ amount: 1350, currency_code: "uah" }],
+            },
+          ],
+          sales_channels: [{ id: defaultSalesChannel.id }],
+        },
+        {
+          title: "Кобура Front Line FL30 поясна",
+          category_ids: [gearCategory.id],
+          description:
+            "Поясна кобура для пістолета ПМ з фіксацією та зручним оперативним доступом.",
+          handle: "front-line-fl30-holster-pm",
+          weight: 150,
+          status: ProductStatus.PUBLISHED,
+          shipping_profile_id: shippingProfile.id,
+          options: [{ id: colorOption.id }],
+          variants: [
+            {
+              title: "Чорний",
+              sku: "IBIS-FL30-BLK",
+              options: { Колір: "Чорний" },
+              prices: [{ amount: 324, currency_code: "uah" }],
+            },
+          ],
+          sales_channels: [{ id: defaultSalesChannel.id }],
+        },
+        {
+          title: "Навушники Walker's Razor Carbon активні",
+          category_ids: [gearCategory.id],
+          description:
+            "Активні навушники для захисту слуху з підсиленням навколишніх звуків та карбоновим корпусом.",
+          handle: "walkers-razor-carbon",
+          weight: 300,
+          status: ProductStatus.PUBLISHED,
+          shipping_profile_id: shippingProfile.id,
+          options: [{ id: colorOption.id }],
+          variants: [
+            {
+              title: "Чорний",
+              sku: "IBIS-WALKRAZOR",
+              options: { Колір: "Чорний" },
+              prices: [{ amount: 4840, currency_code: "uah" }],
+            },
+          ],
+          sales_channels: [{ id: defaultSalesChannel.id }],
+        },
+        {
+          title: "Чохол для зброї Norica 133 см",
+          category_ids: [gearCategory.id],
+          description:
+            "Транспортувальний чохол для зброї довжиною 133 см з м'якою прокладкою.",
+          handle: "norica-gun-case-133",
+          weight: 900,
+          status: ProductStatus.PUBLISHED,
+          shipping_profile_id: shippingProfile.id,
+          options: [{ id: colorOption.id }],
+          variants: [
+            {
+              title: "Чорний",
+              sku: "IBIS-NORICA-133",
+              options: { Колір: "Чорний" },
+              prices: [{ amount: 1430, currency_code: "uah" }],
+            },
+          ],
+          sales_channels: [{ id: defaultSalesChannel.id }],
+        },
+        {
+          title: "Кавер Defcon 5 Helmet Cover mod.Fast",
+          category_ids: [gearCategory.id],
+          description:
+            "Кавер на шолом стандарту FAST з кріпленнями для додаткових аксесуарів.",
+          handle: "defcon5-helmet-cover-fast-coyote",
+          weight: 120,
+          status: ProductStatus.PUBLISHED,
+          shipping_profile_id: shippingProfile.id,
+          options: [{ id: colorOption.id }],
+          variants: [
+            {
+              title: "Койот",
+              sku: "IBIS-DEFCON5-HC-COY",
+              options: { Колір: "Койот" },
+              prices: [{ amount: 370, currency_code: "uah" }],
+            },
+          ],
+          sales_channels: [{ id: defaultSalesChannel.id }],
+        },
+        // Одяг та взуття
+        {
+          title: "Рукавички Mechanix Original",
+          category_ids: [apparelCategory.id],
+          description:
+            "Тактичні рукавички з еластичними вставками та посиленою долонею для щоденного використання.",
+          handle: "mechanix-original-m-olive",
+          weight: 150,
+          status: ProductStatus.PUBLISHED,
+          shipping_profile_id: shippingProfile.id,
+          options: [{ id: sizeOption.id }, { id: colorOption.id }],
+          variants: [
+            {
+              title: "M / Olive Drab",
+              sku: "IBIS-MECH-ORIG-M-OD",
+              options: { Розмір: "M", Колір: "Olive Drab" },
+              prices: [{ amount: 1170, currency_code: "uah" }],
+            },
+          ],
+          sales_channels: [{ id: defaultSalesChannel.id }],
+        },
+        {
+          title: "Набір футболок Pentagon Orpheus",
+          category_ids: [apparelCategory.id],
+          description:
+            "Комплект бавовняних футболок повсякденного крою, розмір M.",
+          handle: "pentagon-orpheus-tshirts-m",
+          weight: 450,
+          status: ProductStatus.PUBLISHED,
+          shipping_profile_id: shippingProfile.id,
+          options: [{ id: sizeOption.id }, { id: colorOption.id }],
+          variants: [
+            {
+              title: "M / Чорний",
+              sku: "IBIS-PENT-ORPH-M-BLK",
+              options: { Розмір: "M", Колір: "Чорний" },
+              prices: [{ amount: 1290, currency_code: "uah" }],
+            },
+            {
+              title: "M / Білий",
+              sku: "IBIS-PENT-ORPH-M-WHT",
+              options: { Розмір: "M", Колір: "Білий" },
+              prices: [{ amount: 1290, currency_code: "uah" }],
+            },
+            {
+              title: "M / Синій",
+              sku: "IBIS-PENT-ORPH-M-BLU",
+              options: { Розмір: "M", Колір: "Синій" },
+              prices: [{ amount: 1290, currency_code: "uah" }],
+            },
+          ],
+          sales_channels: [{ id: defaultSalesChannel.id }],
+        },
+        {
+          title: "Костюм Defcon 5 Sniper Vest+Pants Kit",
+          category_ids: [apparelCategory.id],
+          description:
+            "Камуфльований костюм для маскування: жилет і штани, розмір M.",
+          handle: "defcon5-sniper-vest-pants-kit-m",
+          weight: 1200,
+          status: ProductStatus.PUBLISHED,
+          shipping_profile_id: shippingProfile.id,
+          options: [{ id: sizeOption.id }, { id: colorOption.id }],
+          variants: [
+            {
+              title: "M / Камуфляж",
+              sku: "IBIS-DEFCON5-SNIPER-M",
+              options: { Розмір: "M", Колір: "Камуфляж" },
+              prices: [{ amount: 19320, currency_code: "uah" }],
+            },
+          ],
+          sales_channels: [{ id: defaultSalesChannel.id }],
+        },
+        {
+          title: "Кросівки Pentagon Hybrid 2.0",
+          category_ids: [apparelCategory.id],
+          description:
+            "Тактичні кросівки з дихаючим верхом та зносостійкою підошвою, розмір 41.",
+          handle: "pentagon-hybrid-2-shoes-41",
+          weight: 800,
+          status: ProductStatus.PUBLISHED,
+          shipping_profile_id: shippingProfile.id,
+          options: [{ id: sizeOption.id }, { id: colorOption.id }],
+          variants: [
+            {
+              title: "41 / Сірий",
+              sku: "IBIS-PENT-HYBRID2-41",
+              options: { Розмір: "41", Колір: "Сірий" },
+              prices: [{ amount: 3630, currency_code: "uah" }],
+            },
+          ],
+          sales_channels: [{ id: defaultSalesChannel.id }],
+        },
+        {
+          title: "Черевики AKU Griffon Combat GTX",
+          category_ids: [apparelCategory.id],
+          description:
+            "Бойові черевики з мембраною GORE-TEX для захисту від вологи, розмір 7 (US).",
+          handle: "aku-griffon-combat-gtx-7-brown",
+          weight: 1100,
+          status: ProductStatus.PUBLISHED,
+          shipping_profile_id: shippingProfile.id,
+          options: [{ id: sizeOption.id }, { id: colorOption.id }],
+          variants: [
+            {
+              title: "7 / Brown",
+              sku: "IBIS-AKU-GRIFFON-7-BRN",
+              options: { Розмір: "7", Колір: "Brown" },
+              prices: [{ amount: 8640, currency_code: "uah" }],
+            },
+          ],
+          sales_channels: [{ id: defaultSalesChannel.id }],
         },
       ],
     },

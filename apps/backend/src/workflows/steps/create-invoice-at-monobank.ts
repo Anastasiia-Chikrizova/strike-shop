@@ -21,10 +21,6 @@ export type CreateInvoiceAtMonobankOutput = {
   page_url: string
 }
 
-/**
- * Створює рахунок у Monobank. Компенсація знімає ще не оплачений рахунок,
- * якщо подальші кроки воркфлоу впали.
- */
 export const createInvoiceAtMonobankStep = createStep(
   "create-invoice-at-monobank",
   async (
@@ -63,8 +59,6 @@ export const createInvoiceAtMonobankStep = createStep(
     try {
       await monobank.removeInvoice(invoiceId)
     } catch (e) {
-      // Рахунок могли вже оплатити — тоді зняти його не можна,
-      // і це нормально: вебхук приведе стан до ладу.
       logger.warn(
         `[monobank] Не вдалося скасувати рахунок ${invoiceId}: ${(e as Error).message}`
       )

@@ -68,7 +68,7 @@ const AccountInfo = ({
         </div>
       </div>
 
-      {/* Success state */}
+      {}
       <Disclosure>
         <Disclosure.Panel
           static
@@ -87,7 +87,7 @@ const AccountInfo = ({
         </Disclosure.Panel>
       </Disclosure>
 
-      {/* Error state  */}
+      {}
       <Disclosure>
         <Disclosure.Panel
           static

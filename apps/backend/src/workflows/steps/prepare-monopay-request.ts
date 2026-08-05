@@ -23,12 +23,6 @@ export type PrepareMonoPayRequestOutput = {
   payloadBase64: string
 }
 
-/**
- * Готує дані для віджета MonoPay: payload замовлення, його підпис
- * і keyId нашого публічного ключа. Приватний ключ лишається на бекенді.
- *
- * Мутацій немає — компенсація не потрібна.
- */
 export const prepareMonoPayRequestStep = createStep(
   "prepare-mono-pay-request",
   async (

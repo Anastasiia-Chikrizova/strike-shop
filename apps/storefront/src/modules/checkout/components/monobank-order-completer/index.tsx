@@ -7,14 +7,6 @@ import React, { useEffect, useRef, useState } from "react"
 
 import ErrorMessage from "../error-message"
 
-/**
- * Після повернення з Monobank оплата вже пройшла, але замовлення в Medusa
- * ще не оформлене — робимо це тут. placeOrder сам редіректить на сторінку
- * підтвердження замовлення.
- *
- * Якщо кошика вже немає (замовлення оформили раніше або в іншій вкладці) —
- * мовчки нічого не робимо, оплата від цього не втрачається.
- */
 const MonobankOrderCompleter: React.FC = () => {
   const startedRef = useRef(false)
   const [error, setError] = useState<string | null>(null)
@@ -46,7 +38,6 @@ const MonobankOrderCompleter: React.FC = () => {
   }
 
   useEffect(() => {
-    // React у dev-режимі монтує ефекти двічі — друге оформлення зайве.
     if (startedRef.current) {
       return
     }

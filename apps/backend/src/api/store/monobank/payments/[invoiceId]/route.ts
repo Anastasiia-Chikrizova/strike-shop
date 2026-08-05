@@ -4,15 +4,6 @@ import { monobank } from "../../../../../lib/monobank/client"
 import { toMedusaError } from "../../../../../lib/monobank/to-medusa-error"
 import { toPaymentOutcome } from "../../../../../lib/monobank/types"
 
-/**
- * GET /store/monobank/payments/:invoiceId
- *
- * Перевірка статусу платежу. Використовується сторінкою повернення,
- * щоб одразу показати результат, не чекаючи на вебхук.
- *
- * invoiceId непередбачуваний, тож ендпоінт публічний, але віддає
- * тільки те, що потрібно UI — без даних картки та реквізитів.
- */
 export async function GET(req: MedusaRequest, res: MedusaResponse) {
   const { invoiceId } = req.params
 
@@ -21,7 +12,6 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
 
     res.json({
       invoice_id: invoice.invoiceId,
-      /** pending | paid | hold | failed | canceled */
       outcome: toPaymentOutcome(invoice.status),
       status: invoice.status,
       amount: invoice.amount,
