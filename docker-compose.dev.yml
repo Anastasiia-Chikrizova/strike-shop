@@ -1,4 +1,25 @@
+# Development stack: source is bind-mounted, both apps run their own watcher.
+# Nothing here is built into an image — that is docker-compose.yml (local) and
+# .github/workflows/build-push.yml (CI).
+
 name: strike-shop-local
+
+# Dev logs are noisy and worthless after a restart, so rotate them tighter
+# than staging.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: '20m'
+    max-file: '2'
+
+# Deliberately looser than staging: these containers install dependencies and
+# compile on every change, which prod containers never do. The point here is
+# only to stop one runaway process from taking the whole laptop down.
+x-dev-resources: &dev-resources
+  resources:
+    limits:
+      cpus: '${DEV_APP_CPUS:-2.0}'
+      memory: ${DEV_APP_MEMORY:-2g}
 
 services:
   postgres:
@@ -6,6 +27,9 @@ services:
     environment:
       POSTGRES_USER: ${LOCAL_DB_USER:-medusa}
       POSTGRES_DB: ${LOCAL_DB_NAME:-medusa-strike-shop}
+      # Passwordless is acceptable only because the port below is bound to
+      # 127.0.0.1. Never carry this into staging or prod, where
+      # POSTGRES_PASSWORD is required.
       POSTGRES_HOST_AUTH_METHOD: trust
     ports:
       - '127.0.0.1:5432:5432'
@@ -16,7 +40,13 @@ services:
       interval: 5s
       timeout: 5s
       retries: 12
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512m
     restart: unless-stopped
+    logging: *default-logging
 
   redis:
     image: redis:7-alpine
@@ -30,7 +60,13 @@ services:
       interval: 5s
       timeout: 3s
       retries: 12
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256m
     restart: unless-stopped
+    logging: *default-logging
 
   backend:
     image: node:22-alpine
@@ -45,6 +81,8 @@ services:
       COOKIE_SECRET: ${COOKIE_SECRET:-local_dev_cookie}
     volumes:
       - .:/repo
+      # Named volumes shadow the bind mount so host node_modules (built for
+      # macOS) never leak into the Linux container.
       - backend_root_modules:/repo/node_modules
       - backend_app_modules:/repo/apps/backend/node_modules
     ports:
@@ -57,7 +95,9 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    deploy: *dev-resources
     restart: unless-stopped
+    logging: *default-logging
 
   storefront:
     image: node:22-alpine
@@ -78,7 +118,9 @@ services:
              npm run dev --workspace=@dtc/storefront"
     depends_on:
       - backend
+    deploy: *dev-resources
     restart: unless-stopped
+    logging: *default-logging
 
 volumes:
   pgdata:

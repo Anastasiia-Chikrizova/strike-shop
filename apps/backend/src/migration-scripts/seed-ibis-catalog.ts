@@ -89,7 +89,7 @@ export default async function seed_ibis_catalog({
   });
   const shippingProfile = shippingProfiles[0];
 
-  logger.info("Seeding ІБІС product catalog...");
+  logger.info("Seeding IBIS product catalog...");
 
   const { result: categoryResult } = await createProductCategoriesWorkflow(
     container
@@ -176,7 +176,7 @@ export default async function seed_ibis_catalog({
   await createProductsWorkflow(container).run({
     input: {
       products: [
-        // Зброя
+        // Weapons
         {
           title: "Карабін Howa 1500 HS Precision",
           category_ids: [weaponsCategory.id],
@@ -277,7 +277,7 @@ export default async function seed_ibis_catalog({
           ],
           sales_channels: [{ id: defaultSalesChannel.id }],
         },
-        // Спорядження
+        // Gear
         {
           title: "Підсумок Tasmanian Tiger IFAK Pouch",
           category_ids: [gearCategory.id],
@@ -378,7 +378,7 @@ export default async function seed_ibis_catalog({
           ],
           sales_channels: [{ id: defaultSalesChannel.id }],
         },
-        // Одяг та взуття
+        // Clothing and footwear
         {
           title: "Рукавички Mechanix Original",
           category_ids: [apparelCategory.id],

@@ -79,7 +79,11 @@ const ShippingAddress = ({
     if (cart && !cart.email && customer?.email) {
       setFormAddress(undefined, customer.email)
     }
-  }, [cart])
+    // A genuinely missing dependency: the effect reads customer.email but only
+    // re-ran on cart, so a customer loaded after the cart never populated the
+    // email field. Safe to add — it is a string, and setFormAddress updates
+    // state functionally, so no render loop.
+  }, [cart, customer?.email])
 
   const handleChange = (
     e: React.ChangeEvent<

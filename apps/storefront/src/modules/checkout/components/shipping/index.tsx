@@ -107,6 +107,15 @@ const Shipping: React.FC<ShippingProps> = ({
     if (_pickupMethods?.find((m) => m.id === shippingMethodId)) {
       setShowPickupOptions(PICKUP_OPTION_ON)
     }
+    // Intentionally keyed on availableShippingMethods alone.
+    // _shippingMethods and _pickupMethods are plain .filter() results (see
+    // above), so they get a fresh array identity on every render — listing
+    // them would re-run this effect forever, re-firing the price requests
+    // each time. shippingMethodId is excluded on purpose too: it changes
+    // whenever the customer picks a method, and refetching calculated prices
+    // on every click is pure waste. availableShippingMethods is the real
+    // source these are all derived from.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [availableShippingMethods])
 
   const handleEdit = () => {

@@ -57,9 +57,10 @@ it in `apps/storefront/.env.local`.
 
 ## Deployment
 
-Staging runs on a Linux VM (amd64), exposed via Cloudflare Tunnel. Images are
-built by GitHub Actions and pushed to GHCR. Steps, server setup, and secrets
-are described in [deploy/README.md](deploy/README.md).
+Staging runs on a Linux VM (arm64 — AWS Graviton, `t4g`), exposed via
+Cloudflare Tunnel. Images are built by GitHub Actions and pushed to GHCR.
+Steps, server setup, and secrets are described in
+[deploy/README.md](deploy/README.md).
 
 ## Payments
 

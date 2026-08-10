@@ -26,11 +26,11 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
 
   if (!isValid) {
     httpStatus = 401
-    error = "Невалідний підпис x-sign"
-    logger.warn("[monobank] Вебхук з невалідним підписом — відхилено")
+    error = "Invalid x-sign signature"
+    logger.warn("[monobank] Webhook with an invalid signature — rejected")
   } else if (!payload?.invoiceId || !payload?.status) {
     httpStatus = 400
-    error = "Тіло вебхука без invoiceId або status"
+    error = "Webhook body is missing invoiceId or status"
   } else {
     const outcome = toPaymentOutcome(payload.status)
 
@@ -56,7 +56,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
 
       if (!result.applied) {
         logger.info(
-          `[monobank] Пропущено застарілий вебхук для ${payload.invoiceId}`
+          `[monobank] Skipped a stale webhook for ${payload.invoiceId}`
         )
       } else {
         const eventBus = req.scope.resolve(Modules.EVENT_BUS)
@@ -81,7 +81,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       httpStatus = 500
       error = (e as Error).message
       logger.error(
-        `[monobank] Не вдалося обробити вебхук для ${payload.invoiceId}: ${error}`
+        `[monobank] Failed to process the webhook for ${payload.invoiceId}: ${error}`
       )
     }
   }
@@ -102,7 +102,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
   } catch (e) {
     httpStatus = 500
     error = (e as Error).message
-    logger.error(`[monobank] Не вдалося записати лог вебхука: ${error}`)
+    logger.error(`[monobank] Failed to write the webhook log: ${error}`)
   }
 
   res.status(httpStatus).json(

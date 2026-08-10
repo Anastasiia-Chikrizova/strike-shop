@@ -44,7 +44,6 @@ const MonobankOrderCompleter: React.FC = () => {
 
     startedRef.current = true
     void complete()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   if (error) {

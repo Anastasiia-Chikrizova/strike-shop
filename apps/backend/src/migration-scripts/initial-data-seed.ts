@@ -327,7 +327,7 @@ export default async function initial_data_seed({
   await createProductsWorkflow(container).run({
     input: {
       products: [
-        // Зброя
+        // Weapons
         {
           title: "Карабін Howa 1500 HS Precision",
           category_ids: [weaponsCategory.id],
@@ -428,7 +428,7 @@ export default async function initial_data_seed({
           ],
           sales_channels: [{ id: defaultSalesChannel.id }],
         },
-        // Спорядження
+        // Gear
         {
           title: "Підсумок Tasmanian Tiger IFAK Pouch",
           category_ids: [gearCategory.id],
@@ -529,7 +529,7 @@ export default async function initial_data_seed({
           ],
           sales_channels: [{ id: defaultSalesChannel.id }],
         },
-        // Одяг та взуття
+        // Clothing and footwear
         {
           title: "Рукавички Mechanix Original",
           category_ids: [apparelCategory.id],

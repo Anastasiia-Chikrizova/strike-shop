@@ -9,7 +9,7 @@ import { useCallback } from "react"
 
 const Payment = ({
   cart,
-  availablePaymentMethods,
+  availablePaymentMethods: _availablePaymentMethods,
 }: {
   cart: HttpTypes.StoreCart
   availablePaymentMethods: { id: string }[]

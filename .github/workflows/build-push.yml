@@ -50,15 +50,28 @@ jobs:
           echo "app_env=${{ inputs.environment || (github.ref_name == 'main' && 'prod') || 'staging' }}" >> "$GITHUB_OUTPUT"
           echo "img_prefix=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
 
+  # Lint + typecheck. Both build jobs need it, so a red gate means nothing is
+  # pushed to GHCR. Defined once in quality.yml and reused here rather than
+  # copied, so the PR gate and the release gate cannot drift apart.
+  quality:
+    uses: ./.github/workflows/quality.yml
+
   backend:
-    needs: setup
+    needs: [setup, quality]
     if: github.event_name == 'workflow_dispatch' || needs.setup.outputs.backend_changed == 'true'
-    runs-on: ubuntu-24.04
+    # arm64 runner, so the arm64 image is built natively. Cross-building it on
+    # an amd64 runner would fall back to QEMU and take an order of magnitude
+    # longer. These runners are free for public repositories.
+    runs-on: ubuntu-24.04-arm
     environment: ${{ needs.setup.outputs.app_env }}
 
     env:
       APP_ENV: ${{ needs.setup.outputs.app_env }}
-      PLATFORM: linux/amd64
+      # arm64 targets AWS Graviton (t4g/c7g), roughly 20% cheaper than the
+      # equivalent x86 instance at better price/performance. Node runs on it
+      # natively. Switching back to amd64 means changing this and `runs-on`
+      # together — a mismatch silently costs ~10x build time.
+      PLATFORM: linux/arm64
 
     steps:
       - uses: actions/checkout@v7
@@ -86,14 +99,15 @@ jobs:
           cache-to: type=gha,scope=backend-${{ env.APP_ENV }},mode=max
 
   storefront:
-    needs: setup
+    needs: [setup, quality]
     if: github.event_name == 'workflow_dispatch' || needs.setup.outputs.storefront_changed == 'true'
-    runs-on: ubuntu-24.04
+    # Native arm64, same reasoning as the backend job above.
+    runs-on: ubuntu-24.04-arm
     environment: ${{ needs.setup.outputs.app_env }}
 
     env:
       APP_ENV: ${{ needs.setup.outputs.app_env }}
-      PLATFORM: linux/amd64
+      PLATFORM: linux/arm64
 
     steps:
       - uses: actions/checkout@v7
@@ -135,7 +149,7 @@ jobs:
         run: rm -f /tmp/storefront.env
 
   summary:
-    needs: [setup, backend, storefront]
+    needs: [setup, quality, backend, storefront]
     if: always()
     runs-on: ubuntu-24.04
     steps:
@@ -143,14 +157,20 @@ jobs:
         run: |
           echo "### ${{ needs.setup.outputs.app_env }} → ${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
-          if [ "${{ needs.backend.result }}" = "success" ]; then
-            echo "${{ needs.setup.outputs.img_prefix }}/strike-backend:${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
+          # A red gate skips both build jobs. Without this branch the summary
+          # would blame "no changes" for what is actually a blocked release.
+          if [ "${{ needs.quality.result }}" != "success" ]; then
+            echo "nothing built: quality gate ${{ needs.quality.result }}" >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "backend: skipped, no changes under apps/backend" >> "$GITHUB_STEP_SUMMARY"
-          fi
-          if [ "${{ needs.storefront.result }}" = "success" ]; then
-            echo "${{ needs.setup.outputs.img_prefix }}/strike-storefront:${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "storefront: skipped, no changes under apps/storefront" >> "$GITHUB_STEP_SUMMARY"
+            if [ "${{ needs.backend.result }}" = "success" ]; then
+              echo "${{ needs.setup.outputs.img_prefix }}/strike-backend:${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "backend: skipped, no changes under apps/backend" >> "$GITHUB_STEP_SUMMARY"
+            fi
+            if [ "${{ needs.storefront.result }}" = "success" ]; then
+              echo "${{ needs.setup.outputs.img_prefix }}/strike-storefront:${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "storefront: skipped, no changes under apps/storefront" >> "$GITHUB_STEP_SUMMARY"
+            fi
           fi
           echo '```' >> "$GITHUB_STEP_SUMMARY"

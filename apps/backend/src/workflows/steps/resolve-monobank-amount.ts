@@ -43,14 +43,14 @@ export const resolveMonobankAmountStep = createStep(
       if (!cart) {
         throw new MedusaError(
           MedusaError.Types.NOT_FOUND,
-          `Кошик ${input.cart_id} не знайдено.`
+          `Cart ${input.cart_id} was not found.`
         )
       }
 
       if (cart.completed_at) {
         throw new MedusaError(
           MedusaError.Types.NOT_ALLOWED,
-          `Кошик ${input.cart_id} вже оформлено.`
+          `Cart ${input.cart_id} has already been completed.`
         )
       }
 
@@ -68,14 +68,14 @@ export const resolveMonobankAmountStep = createStep(
     if (!input.amount) {
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
-        "Потрібен `cart_id` або `amount`."
+        "Either `cart_id` or `amount` is required."
       )
     }
 
     if (process.env.MONO_ALLOW_CLIENT_AMOUNT !== "true") {
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
-        "Передавайте `cart_id` — сума рахується на сервері. Щоб дозволити явний `amount`, увімкніть MONO_ALLOW_CLIENT_AMOUNT=true."
+        "Pass `cart_id` — the amount is calculated on the server. To allow an explicit `amount`, set MONO_ALLOW_CLIENT_AMOUNT=true."
       )
     }
 
@@ -93,7 +93,7 @@ function toMinorUnits(total: unknown): number {
   if (!Number.isFinite(value) || value <= 0) {
     throw new MedusaError(
       MedusaError.Types.INVALID_DATA,
-      "Сума до оплати має бути більшою за нуль."
+      "The amount to pay must be greater than zero."
     )
   }
 

@@ -128,7 +128,7 @@ const LanguageSelect = ({
             {current && (
               <span className="txt-compact-small flex items-center gap-x-2">
                 {current.countryCode && (
-                  /* @ts-ignore */
+                  /* @ts-expect-error - ReactCountryFlag's types don't match React 19's JSX namespace */
                   <ReactCountryFlag
                     svg
                     style={{
@@ -162,7 +162,7 @@ const LanguageSelect = ({
                   className="py-2 hover:bg-gray-200 px-3 cursor-pointer flex items-center gap-x-2"
                 >
                   {o.countryCode ? (
-                    /* @ts-ignore */
+                    /* @ts-expect-error - ReactCountryFlag's types don't match React 19's JSX namespace */
                     <ReactCountryFlag
                       svg
                       style={{

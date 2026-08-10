@@ -1,0 +1,54 @@
+name: quality
+
+# The gate that can actually block a release.
+#
+# It runs on every pull request, and build-push.yml calls it as a reusable
+# workflow before any image is built — so a failure here means nothing reaches
+# GHCR. That indirection exists because the storefront image build cannot be
+# trusted to catch anything: apps/storefront/next.config.js sets
+# `eslint.ignoreDuringBuilds` and `typescript.ignoreBuildErrors`, deliberately,
+# to keep `next build` fast. This workflow is the only place type errors and
+# lint errors surface.
+
+on:
+  pull_request:
+  workflow_call:
+
+concurrency:
+  group: quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      # Full install: turbo drives both workspaces from the repo root.
+      - name: Install
+        run: npm ci --no-audit --no-fund
+
+      # Both workspaces currently emit warnings (Medusa price-unit hints,
+      # react-hooks/exhaustive-deps) but zero errors, so this gates on errors
+      # only. Tightening to --max-warnings=0 is a separate cleanup.
+      - name: Lint
+        run: npm run lint
+
+      # The storefront tsconfig includes .next/types, which holds the generated
+      # typed-route definitions. `next typegen` writes them without a full
+      # build; without it tsc reports phantom errors on typed <Link href>.
+      # The publishable key is a placeholder purely to satisfy
+      # check-env-variables.js — typegen never calls the backend.
+      - name: Typecheck
+        env:
+          NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY: pk_ci_placeholder
+        run: npm run typecheck

@@ -60,7 +60,7 @@ export const createInvoiceAtMonobankStep = createStep(
       await monobank.removeInvoice(invoiceId)
     } catch (e) {
       logger.warn(
-        `[monobank] Не вдалося скасувати рахунок ${invoiceId}: ${(e as Error).message}`
+        `[monobank] Failed to cancel invoice ${invoiceId}: ${(e as Error).message}`
       )
     }
   }

@@ -2,9 +2,10 @@
 
 | File | What it is |
 | --- | --- |
+| [`.github/workflows/quality.yml`](../.github/workflows/quality.yml) | lint + typecheck; runs on PRs and is called by the build |
 | [`.github/workflows/build-push.yml`](../.github/workflows/build-push.yml) | builds both images for `linux/arm64` → GHCR |
 | [`docker-compose.staging.yml`](../docker-compose.staging.yml) | deploy stack: only `image:`, no `build:` |
-| [`Caddyfile`](Caddyfile) | reverse proxy + automatic Let's Encrypt |
+| [`Caddyfile`](Caddyfile) | reverse proxy on plain HTTP — TLS terminates at the Cloudflare edge |
 | [`deploy.sh`](deploy.sh) | pull → migrate → up → wait for healthy |
 | `*.env.example` | templates; the real files live in `/etc/strike-shop/` and never go into git |
 
@@ -16,7 +17,9 @@ The `docker-compose.yml` in the repo root builds from source (local/manual),
 
 ## 1. Prerequisites
 
-- a Linux VM with Docker;
+- a Linux **arm64** VM with Docker — the images are arm64-only. On AWS that
+  means a Graviton instance (`t4g.medium` and up); an x86 `t3` will refuse to
+  run them with `exec format error`;
 - a Cloudflare Tunnel pointed at that VM, and two domains (or subdomains):
   `staging.…` for the storefront, `api.staging.…` for the backend, bound to
   the tunnel (instead of A records pointing at a public IP);
@@ -70,7 +73,14 @@ echo "<PAT>" | docker login ghcr.io -u Anastasiia-Chikrizova --password-stdin
 Settings → Environments → **staging** (and later **prod**), each with a
 secret named `STOREFRONT_ENV` — the full contents of `storefront.env` as
 text. The workflow picks the Environment based on the branch: `dev` →
-staging, `master` → prod.
+staging, `main` → prod. Those two are the only long-lived branches; `main`
+is the repository default.
+
+Every build first calls the `quality` workflow (lint + typecheck) and both
+image jobs `needs` it, so a red gate pushes nothing to GHCR. It matters here
+more than usual: `apps/storefront/next.config.js` sets
+`typescript.ignoreBuildErrors` and `eslint.ignoreDuringBuilds`, so the image
+build itself would happily ship code that does not typecheck.
 
 ---
 
@@ -138,7 +148,55 @@ Migrations don't roll back — rolling back the image with an incompatible DB
 schema won't save you. Tolerable on staging; for prod, take a `pg_dump`
 before rolling out.
 
-## 7. Monobank on staging
+## 7. Architecture, resource limits, sizing and logs
+
+Images are built for `linux/arm64` only, on GitHub's `ubuntu-24.04-arm`
+runners (free for public repos, so the build is native rather than QEMU-
+emulated). The target is AWS Graviton — `t4g` is roughly 20% cheaper than the
+equivalent `t3` at better price/performance, and Node runs on it natively.
+
+The cost of that choice: the instance must be arm64. Changing `PLATFORM` in
+`build-push.yml` without changing `runs-on` in the same job still produces a
+working image, just ~10x slower via emulation — they have to move together.
+
+
+Every service declares `deploy.resources.limits`. Compose V2 honours these
+outside swarm, so they are real cgroup limits, not documentation. The reason
+they exist is sizing: without them one runaway Node process takes the whole
+box down with it, and there is no defensible way to pick an instance type —
+only guessing with a safety margin, which means paying for idle RAM.
+
+Defaults in `docker-compose.staging.yml`, all overridable from `stack.env`:
+
+| Service | CPUs | Memory |
+| --- | --- | --- |
+| postgres | 1.0 | 768m |
+| redis | 0.5 | 256m |
+| backend | 1.5 | 1536m |
+| storefront | 1.0 | 768m |
+| caddy | 0.5 | 128m |
+| **total** | **4.5** | **~3.4 GB** |
+
+That fits a 4 GB instance. The backend gets the largest share because Medusa
+serves the API and runs background jobs in one process
+(`MEDUSA_WORKER_MODE=shared`); the storefront only serves a prebuilt
+standalone bundle and never compiles at runtime.
+
+These are starting points, not measurements. Before shrinking anything, watch
+real usage under load:
+
+```bash
+docker stats --no-stream
+```
+
+`docker-compose.dev.yml` sets deliberately looser limits (2 GB per app),
+because those containers install dependencies and compile on every change.
+
+Logs rotate at `50m × 3` per service — about 750 MB across the stack. The
+previous `250m × 7` allowed ~8.75 GB, which is most of a small EBS volume.
+Tunable via `LOG_MAX_SIZE` / `LOG_MAX_FILE`.
+
+## 8. Monobank on staging
 
 The sandbox differs **only in the token** — `MONO_API_URL` is the same
 production `https://api.monobank.ua`. Both URLs must be public https,
@@ -153,7 +211,7 @@ Verify after rollout by checking that the `monobank_webhook_log` table is
 filling up (it also records webhooks that failed signature verification).
 Integration details: [apps/backend/src/lib/monobank/README.md](../apps/backend/src/lib/monobank/README.md).
 
-## 8. Known issue: migrations inside the container
+## 9. Known issue: migrations inside the container
 
 **Verified locally (Docker Desktop, macOS/arm64):** `npx medusa db:migrate`
 hangs inside the container. The process goes to sleep in `epoll_wait`,
@@ -193,7 +251,7 @@ The timeout is configurable, by the way:
 `MEDUSA_DB_MIGRATION_CONNECTION_TIMEOUT` (milliseconds). Raising it doesn't
 fix anything — the process just hangs longer.
 
-## 9. Deliberately out of scope here
+## 10. Deliberately out of scope here
 
 - **backups** — unnecessary for staging; for prod, at minimum a cron
   `pg_dump` into Cloudflare R2 (same bucket as images, or a separate one);

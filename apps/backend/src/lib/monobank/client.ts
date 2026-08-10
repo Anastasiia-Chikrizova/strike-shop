@@ -43,7 +43,7 @@ export class MonobankClient {
 
     if (!token) {
       throw new MonobankError(
-        "MONO_KEY is not set. Отримайте токен на https://web.monobank.ua/ (або тестовий на https://api.monobank.ua/).",
+        "MONO_KEY is not set. Get a token at https://web.monobank.ua/ (or a test one at https://api.monobank.ua/).",
         500
       )
     }
@@ -87,7 +87,7 @@ export class MonobankClient {
       })
     } catch (e) {
       throw new MonobankError(
-        `Monobank ${method} ${path} недоступний: ${(e as Error).message}`,
+        `Monobank ${method} ${path} is unavailable: ${(e as Error).message}`,
         503
       )
     }

@@ -1,19 +1,21 @@
-# TLS термінується на Cloudflare Edge (тунель шле сюди вже голий HTTP на
-# :80), тому Caddy тут HTTPS не піднімає — інакше він сам редиректить
-# HTTP→HTTPS, а Cloudflare знову шле HTTP, і виходить нескінченний редирект
-# (перевірено на практиці: ERR_TOO_MANY_REDIRECTS).
-# Домени підставляються з env (див. deploy/stack.env.example).
+# TLS is terminated at the Cloudflare edge (the tunnel forwards plain HTTP to
+# :80 here), so Caddy does not serve HTTPS itself — otherwise it would redirect
+# HTTP→HTTPS, Cloudflare would send HTTP again, and the two would loop forever
+# (confirmed in practice: ERR_TOO_MANY_REDIRECTS).
+# Domains come from env, see deploy/stack.env.example.
 
-# Бекенд: Store API, адмінка на /app, вебхук монобанку на /webhooks/monobank.
+# Backend: Store API, admin dashboard at /app, Monobank webhook at
+# /webhooks/monobank.
 http://{$BACKEND_DOMAIN} {
 	encode zstd gzip
 
-	# Тіло вебхука перевіряється за сирими байтами — нічого не переписуємо.
+	# The webhook body is verified against its raw bytes — rewrite nothing.
 	reverse_proxy backend:9000 {
-		# {scheme} тут завжди "http" (реальний протокол Caddy↔cloudflared),
-		# а не той, яким реально йшов клієнт — той завжди https, бо термінується
-		# на Cloudflare Edge. Захардкожено, інакше бекенд думає, що з'єднання
-		# небезпечне, і ламає атрибути Secure/SameSite у куках сесії.
+		# {scheme} is always "http" here (the real Caddy↔cloudflared protocol),
+		# not the one the client actually used — that is always https, since it
+		# terminates at the Cloudflare edge. Hardcoded, because otherwise the
+		# backend believes the connection is insecure and drops the Secure /
+		# SameSite attributes on session cookies.
 		header_up X-Forwarded-Proto https
 		header_up X-Forwarded-Host {host}
 	}
@@ -24,15 +26,13 @@ http://{$BACKEND_DOMAIN} {
 	}
 }
 
-# Сторфронт.
+# Storefront.
 http://{$STOREFRONT_DOMAIN} {
 	encode zstd gzip
 
 	reverse_proxy storefront:8000 {
-		# {scheme} тут завжди "http" (реальний протокол Caddy↔cloudflared),
-		# а не той, яким реально йшов клієнт — той завжди https, бо термінується
-		# на Cloudflare Edge. Захардкожено, інакше бекенд думає, що з'єднання
-		# небезпечне, і ламає атрибути Secure/SameSite у куках сесії.
+		# Same reasoning as above: the hardcoded proto keeps cookie security
+		# attributes intact behind the double termination.
 		header_up X-Forwarded-Proto https
 		header_up X-Forwarded-Host {host}
 	}
