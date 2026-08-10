@@ -83,3 +83,7 @@ Thumbs.db
 .idea
 **/.env.*
 !**/.env.template
+
+# Agent tooling — personal setup, not shared with the repo
+.claude/
+.agents/
