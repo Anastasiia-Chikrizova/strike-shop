@@ -60,7 +60,15 @@ it in `apps/storefront/.env.local`.
 Staging runs on a Linux VM (arm64 — AWS Graviton, `t4g`), exposed via
 Cloudflare Tunnel. Images are built by GitHub Actions and pushed to GHCR.
 Steps, server setup, and secrets are described in
-[deploy/README.md](deploy/README.md).
+[deploy/README.md](deploy/README.md). The AWS side — what is provisioned, what
+it costs, and why it is shaped that way — is in
+[infra/README.md](infra/README.md).
+
+What the same application would look like without a fixed credit budget is
+written up separately in
+[docs/production-architecture.md](docs/production-architecture.md). That design
+is not deployed and is not intended to be; it exists to make the cost
+trade-offs in the deployed one explicit.
 
 ## Payments
 
