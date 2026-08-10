@@ -20,6 +20,30 @@ coverage
 **/.next/
 **/out/
 
+# TypeScript incremental build cache
+*.tsbuildinfo
+
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+# tfvars may hold real values; the .example templates are tracked.
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+# .terraform.lock.hcl is deliberately NOT ignored in root modules — it pins
+# provider hashes, same role as package-lock.json. Reusable modules do not
+# consume a lock file, so theirs is just init noise.
+infra/modules/*/.terraform.lock.hcl
+
 # Production
 **/build
 **/dist

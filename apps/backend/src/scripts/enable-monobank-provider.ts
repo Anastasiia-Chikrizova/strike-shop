@@ -21,7 +21,7 @@ export default async function enableMonobankProvider({
   })
 
   if (!regions.length) {
-    logger.error("Регіонів не знайдено.")
+    logger.error("No regions found.")
     return
   }
 
@@ -38,7 +38,7 @@ export default async function enableMonobankProvider({
           row.payment_provider_id === PROVIDER_ID
       )
     ) {
-      logger.info(`[monobank] ${region.name}: провайдер уже увімкнено`)
+      logger.info(`[monobank] ${region.name}: provider already enabled`)
       continue
     }
 
@@ -47,6 +47,6 @@ export default async function enableMonobankProvider({
       [Modules.PAYMENT]: { payment_provider_id: PROVIDER_ID },
     })
 
-    logger.info(`[monobank] ${region.name}: провайдер увімкнено`)
+    logger.info(`[monobank] ${region.name}: provider enabled`)
   }
 }

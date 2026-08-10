@@ -81,7 +81,7 @@ class MonobankPaymentProviderService extends AbstractPaymentProvider<Options> {
     if (!options?.apiKey && !process.env.MONO_KEY) {
       throw new MedusaError(
         MedusaError.Types.INVALID_ARGUMENT,
-        "Monobank: потрібен apiKey в опціях провайдера або MONO_KEY в оточенні."
+        "Monobank: apiKey is required in the provider options, or MONO_KEY in the environment."
       )
     }
   }
@@ -173,7 +173,7 @@ class MonobankPaymentProviderService extends AbstractPaymentProvider<Options> {
     if (!data?.invoice_id) {
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
-        "Monobank: у платежі немає invoice_id, повернення неможливе."
+        "Monobank: the payment has no invoice_id, a refund is not possible."
       )
     }
 
@@ -208,7 +208,7 @@ class MonobankPaymentProviderService extends AbstractPaymentProvider<Options> {
       }
     } catch (e) {
       this.logger_.warn(
-        `[monobank] Не вдалося скасувати рахунок ${data.invoice_id}: ${(e as Error).message}`
+        `[monobank] Failed to cancel invoice ${data.invoice_id}: ${(e as Error).message}`
       )
     }
 
@@ -225,7 +225,7 @@ class MonobankPaymentProviderService extends AbstractPaymentProvider<Options> {
         await this.client_.removeInvoice(data.invoice_id)
       } catch (e) {
         this.logger_.warn(
-          `[monobank] Рахунок ${data.invoice_id} не видалено: ${(e as Error).message}`
+          `[monobank] Invoice ${data.invoice_id} was not deleted: ${(e as Error).message}`
         )
       }
     }
@@ -290,7 +290,7 @@ class MonobankPaymentProviderService extends AbstractPaymentProvider<Options> {
     )
 
     if (!isValid) {
-      this.logger_.warn("[monobank] Вебхук з невалідним підписом — відхилено")
+      this.logger_.warn("[monobank] Webhook with an invalid signature — rejected")
       return { action: "not_supported" }
     }
 
@@ -319,7 +319,7 @@ class MonobankPaymentProviderService extends AbstractPaymentProvider<Options> {
 
       case "reversed":
         this.logger_.info(
-          `[monobank] Рахунок ${body.invoiceId} повернуто (reversed), сума ${body.finalAmount ?? 0}`
+          `[monobank] Invoice ${body.invoiceId} reversed, amount ${body.finalAmount ?? 0}`
         )
         return { action: "not_supported" }
 
@@ -339,7 +339,7 @@ class MonobankPaymentProviderService extends AbstractPaymentProvider<Options> {
     if (!invoiceId) {
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
-        "Monobank: у сесії оплати немає invoice_id."
+        "Monobank: the payment session has no invoice_id."
       )
     }
 
@@ -395,7 +395,7 @@ class MonobankPaymentProviderService extends AbstractPaymentProvider<Options> {
     if (!Number.isFinite(value) || value <= 0) {
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
-        `Monobank: некоректна сума ${JSON.stringify(amount)}.`
+        `Monobank: invalid amount ${JSON.stringify(amount)}.`
       )
     }
 
@@ -408,7 +408,7 @@ class MonobankPaymentProviderService extends AbstractPaymentProvider<Options> {
     if (!ccy) {
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
-        `Monobank не працює з валютою ${currencyCode}.`
+        `Monobank does not support the currency ${currencyCode}.`
       )
     }
 

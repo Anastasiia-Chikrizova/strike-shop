@@ -39,7 +39,7 @@ export function loadPrivateKey(pem?: string): crypto.KeyObject {
 
   if (!raw) {
     throw new MonobankError(
-      "MONOPAY_PRIVATE_KEY is not set. Згенеруйте пару ключів: npx medusa exec ./src/scripts/monopay-keys.ts",
+      "MONOPAY_PRIVATE_KEY is not set. Generate a key pair: npx medusa exec ./src/scripts/monopay-keys.ts",
       500
     )
   }
@@ -54,7 +54,7 @@ export function loadPrivateKey(pem?: string): crypto.KeyObject {
     key = crypto.createPrivateKey(normalized)
   } catch (e) {
     throw new MonobankError(
-      `MONOPAY_PRIVATE_KEY не читається як PEM: ${(e as Error).message}`,
+      `MONOPAY_PRIVATE_KEY cannot be parsed as PEM: ${(e as Error).message}`,
       500
     )
   }
@@ -63,7 +63,7 @@ export function loadPrivateKey(pem?: string): crypto.KeyObject {
 
   if (key.asymmetricKeyType !== "ec" || curve !== "prime256v1") {
     throw new MonobankError(
-      `MonoPay вимагає ECDSA P-256, а ключ — ${key.asymmetricKeyType}/${curve ?? "?"}.`,
+      `MonoPay requires ECDSA P-256, but the key is ${key.asymmetricKeyType}/${curve ?? "?"}.`,
       500
     )
   }
@@ -87,7 +87,7 @@ export async function getMonoPayKeyId(
 
   if (!keyId) {
     throw new MonobankError(
-      "У мерчанта немає жодного публічного ключа MonoPay. Імпортуйте його: npx medusa exec ./src/scripts/monopay-keys.ts",
+      "The merchant has no MonoPay public key. Import one: npx medusa exec ./src/scripts/monopay-keys.ts",
       500
     )
   }

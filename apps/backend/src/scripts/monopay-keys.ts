@@ -21,17 +21,17 @@ export default async function monopayKeys({ args, container }: ExecArgs) {
       logger.info(
         [
           "",
-          "=== ПРИВАТНИЙ КЛЮЧ — тільки в .env бекенда, ніколи на фронтенд ===",
+          "=== PRIVATE KEY — backend .env only, never the frontend ===",
           "",
           "MONOPAY_PRIVATE_KEY=" +
             Buffer.from(privateKey).toString("base64") +
-            "  # base64(PEM), щоб не ламати переноси рядків",
+            "  # base64(PEM), so the line breaks survive",
           "",
-          "=== ПУБЛІЧНИЙ КЛЮЧ (PEM) ===",
+          "=== PUBLIC KEY (PEM) ===",
           "",
           publicKey.trim(),
           "",
-          "Далі: покладіть MONOPAY_PRIVATE_KEY у .env і виконайте",
+          "Next: put MONOPAY_PRIVATE_KEY into .env and run",
           "npx medusa exec ./src/scripts/monopay-keys.ts import",
           "",
         ].join("\n")
@@ -50,19 +50,19 @@ export default async function monopayKeys({ args, container }: ExecArgs) {
         keyName: argument ?? "medusa-storefront",
       })
 
-      logger.info("[monopay] Публічний ключ імпортовано. Список ключів:")
+      logger.info("[monopay] Public key imported. Key list:")
       await printKeys(logger)
       break
     }
 
     case "delete": {
       if (!argument) {
-        logger.error("Вкажіть keyId: ... monopay-keys.ts delete pk_test_…")
+        logger.error("Specify a keyId: ... monopay-keys.ts delete pk_test_…")
         return
       }
 
       await monobank.deleteMonoPayKey(argument)
-      logger.info(`[monopay] Ключ ${argument} видалено.`)
+      logger.info(`[monopay] Key ${argument} deleted.`)
       break
     }
 
@@ -76,7 +76,7 @@ async function printKeys(logger: { info: (message: string) => void }) {
 
   if (!keys.length) {
     logger.info(
-      "[monopay] Ключів немає. Створіть: ... monopay-keys.ts generate"
+      "[monopay] No keys found. Create one: ... monopay-keys.ts generate"
     )
     return
   }
