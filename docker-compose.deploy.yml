@@ -27,7 +27,7 @@ services:
           memory: ${POSTGRES_MEMORY:-768m}
         reservations:
           memory: ${POSTGRES_MEMORY_MIN:-256m}
-    restart: unless-stoppedоно 
+    restart: unless-stopped
     logging: *default-logging
 
   redis:
@@ -127,28 +127,26 @@ services:
     restart: unless-stopped
     logging: *default-logging
 
-  caddy:
-    image: caddy:2-alpine
+  nginx:
+    image: nginx:alpine
     environment:
       BACKEND_DOMAIN: ${BACKEND_DOMAIN:?set BACKEND_DOMAIN}
       STOREFRONT_DOMAIN: ${STOREFRONT_DOMAIN:?set STOREFRONT_DOMAIN}
-      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL}
     ports:
       - '80:80'
-      - '443:443'
-      - '443:443/udp'
     volumes:
-      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy-data:/data
-      - caddy-config:/config
+      - ./deploy/nginx/nginx.conf.template:/etc/nginx/templates/nginx.conf.template
+      # Base image ships a default catch-all vhost on :80 — drop it so only
+      # our two server blocks (by server_name) are active.
+      - /dev/null:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       - backend
       - storefront
     deploy:
       resources:
         limits:
-          cpus: '${CADDY_CPUS:-0.5}'
-          memory: ${CADDY_MEMORY:-128m}
+          cpus: '${NGINX_CPUS:-0.5}'
+          memory: ${NGINX_MEMORY:-128m}
     restart: unless-stopped
     logging: *default-logging
 
@@ -156,5 +154,3 @@ volumes:
   pgdata:
   redisdata:
   backend-static:
-  caddy-data:
-  caddy-config:
