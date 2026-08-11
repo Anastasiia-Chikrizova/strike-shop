@@ -3,8 +3,6 @@
 FROM node:22-alpine AS deps
 WORKDIR /repo
 
-RUN apk add --no-cache python3 make g++
-
 COPY package.json package-lock.json ./
 COPY apps/backend/package.json apps/backend/
 
@@ -13,8 +11,6 @@ RUN --mount=type=cache,target=/root/.npm \
 
 FROM node:22-alpine AS builder
 WORKDIR /repo
-
-RUN apk add --no-cache python3 make g++
 
 COPY package.json package-lock.json ./
 COPY apps/backend apps/backend
@@ -37,7 +33,6 @@ ARG APP_ENV=production
 LABEL app.env=$APP_ENV
 
 ENV NODE_ENV=production
-ENV APP_ENV=$APP_ENV
 ENV PORT=9000
 
 COPY --from=server-deps --chown=node:node /app ./

@@ -9,7 +9,7 @@ set -euo pipefail
 
 STACK_ENV="${STACK_ENV:-/etc/strike-shop/stack.env}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-COMPOSE_FILE="$ROOT/docker-compose.staging.yml"
+COMPOSE_FILE="$ROOT/docker-compose.deploy.yml"
 
 step() { printf '\n\033[1;36m==> %s\033[0m\n' "$1"; }
 die() { printf '\n\033[1;31m!! %s\033[0m\n' "$1" >&2; exit 1; }

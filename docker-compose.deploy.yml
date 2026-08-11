@@ -1,12 +1,5 @@
-# Deployment file: builds nothing, only pulls ready images from GHCR.
-# Building lives in CI (.github/workflows/build-push.yml); local builds live
-# in docker-compose.yml. Run this through deploy/deploy.sh.
-
 name: strike-shop-${APP_ENV:?set APP_ENV=staging|prod}
 
-# 50m x 3 files per service. With five services that caps disk usage at
-# ~750 MB. The previous 250m x 7 allowed ~8.75 GB, which is most of a small
-# EBS volume.
 x-logging: &default-logging
   driver: ${LOG_DRIVER:-json-file}
   options:
@@ -27,9 +20,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 12
-    # Limits are what makes instance sizing a calculation instead of a guess:
-    # the sum below is the smallest box the stack fits on. Tune per
-    # environment via stack.env, measure first with `docker stats`.
     deploy:
       resources:
         limits:
@@ -37,7 +27,7 @@ services:
           memory: ${POSTGRES_MEMORY:-768m}
         reservations:
           memory: ${POSTGRES_MEMORY_MIN:-256m}
-    restart: unless-stopped
+    restart: unless-stoppedоно 
     logging: *default-logging
 
   redis:
@@ -58,8 +48,6 @@ services:
     restart: unless-stopped
     logging: *default-logging
 
-  # One-shot: `docker compose run --rm migrate`. Kept in a profile so it does
-  # not come up with `up`. Same image as the backend — the CLI lives in it.
   migrate:
     profiles: [tools]
     image: ${BACKEND_IMAGE:?set BACKEND_IMAGE}
@@ -72,7 +60,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    # Runs while the backend is down, so it may borrow the backend's budget.
     deploy:
       resources:
         limits:
@@ -93,8 +80,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    # Not published externally — outside traffic goes through caddy only.
-    # The port stays bound to 127.0.0.1 for debugging from the box itself.
     ports:
       - '127.0.0.1:${BACKEND_PORT:-9000}:9000'
     volumes:
@@ -105,8 +90,6 @@ services:
       timeout: 5s
       retries: 12
       start_period: 40s
-    # Medusa runs API and background jobs in one process
-    # (MEDUSA_WORKER_MODE=shared), so it gets the largest share.
     deploy:
       resources:
         limits:
@@ -122,8 +105,6 @@ services:
     env_file:
       - ${STOREFRONT_ENV_FILE:?set STOREFRONT_ENV_FILE}
     environment:
-      # SSR reaches the backend over the internal network; the public URL is
-      # not needed here.
       MEDUSA_BACKEND_URL: ${MEDUSA_BACKEND_URL:-http://backend:9000}
     depends_on:
       backend:
@@ -136,7 +117,6 @@ services:
       timeout: 5s
       retries: 12
       start_period: 30s
-    # Already-built standalone output — it only serves, never compiles.
     deploy:
       resources:
         limits:

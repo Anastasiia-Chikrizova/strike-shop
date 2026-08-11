@@ -4,14 +4,14 @@
 | --- | --- |
 | [`.github/workflows/quality.yml`](../.github/workflows/quality.yml) | lint + typecheck; runs on PRs and is called by the build |
 | [`.github/workflows/build-push.yml`](../.github/workflows/build-push.yml) | builds both images for `linux/arm64` → GHCR |
-| [`docker-compose.staging.yml`](../docker-compose.staging.yml) | deploy stack: only `image:`, no `build:` |
+| [`docker-compose.deploy.yml`](../docker-compose.deploy.yml) | deploy stack: only `image:`, no `build:` |
 | [`Caddyfile`](Caddyfile) | reverse proxy on plain HTTP — TLS terminates at the Cloudflare edge |
 | [`deploy.sh`](deploy.sh) | pull → migrate → up → wait for healthy |
 | `*.env.example` | templates; the real files live in `/etc/strike-shop/` and never go into git |
 
-The `docker-compose.yml` in the repo root builds from source (local/manual),
-`docker-compose.dev.yml` is for development. The server only needs
-`docker-compose.staging.yml`.
+The `docker-compose.local.yml` in the repo root builds from source
+(local/manual), `docker-compose.dev.yml` is for development. The server only
+needs `docker-compose.deploy.yml`.
 
 ---
 
@@ -36,7 +36,7 @@ sudo usermod -aG docker "$USER"   # log back in afterward
 ```
 
 Public access goes through Cloudflare Tunnel (`cloudflared`), so 80/443 don't
-need to be opened externally — `caddy` in `docker-compose.staging.yml` only
+need to be opened externally — `caddy` in `docker-compose.deploy.yml` only
 listens for what the tunnel forwards to it, and the tunnel itself is set up
 separately (TODO: document `cloudflared` as a service/container here once
 that's settled).
@@ -97,7 +97,7 @@ once. So the backend goes up first, and only then is the storefront built.
 ```bash
 cd /opt/strike-shop
 set -a; . /etc/strike-shop/stack.env; set +a
-compose() { docker compose --env-file /etc/strike-shop/stack.env -f docker-compose.staging.yml "$@"; }
+compose() { docker compose --env-file /etc/strike-shop/stack.env -f docker-compose.deploy.yml "$@"; }
 
 compose pull backend
 compose up -d postgres redis
@@ -166,7 +166,7 @@ they exist is sizing: without them one runaway Node process takes the whole
 box down with it, and there is no defensible way to pick an instance type —
 only guessing with a safety margin, which means paying for idle RAM.
 
-Defaults in `docker-compose.staging.yml`, all overridable from `stack.env`:
+Defaults in `docker-compose.deploy.yml`, all overridable from `stack.env`:
 
 | Service | CPUs | Memory |
 | --- | --- | --- |
