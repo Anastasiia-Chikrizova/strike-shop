@@ -1,20 +1,5 @@
-# Development stack: source is bind-mounted, both apps run their own watcher.
-# Nothing here is built into an image — that is docker-compose.yml (local) and
-# .github/workflows/build-push.yml (CI).
-
 name: strike-shop-local
 
-# Dev logs are noisy and worthless after a restart, so rotate them tighter
-# than staging.
-x-logging: &default-logging
-  driver: json-file
-  options:
-    max-size: '20m'
-    max-file: '2'
-
-# Deliberately looser than staging: these containers install dependencies and
-# compile on every change, which prod containers never do. The point here is
-# only to stop one runaway process from taking the whole laptop down.
 x-dev-resources: &dev-resources
   resources:
     limits:
@@ -27,16 +12,13 @@ services:
     environment:
       POSTGRES_USER: ${LOCAL_DB_USER:-medusa}
       POSTGRES_DB: ${LOCAL_DB_NAME:-medusa-strike-shop}
-      # Passwordless is acceptable only because the port below is bound to
-      # 127.0.0.1. Never carry this into staging or prod, where
-      # POSTGRES_PASSWORD is required.
       POSTGRES_HOST_AUTH_METHOD: trust
     ports:
       - '127.0.0.1:5432:5432'
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${LOCAL_DB_USER:-medusa}']
+      test: ['CMD-SHELL', 'pg_isready -U ${LOCAL_DB_USER:-medusa} -d ${LOCAL_DB_NAME:-medusa-strike-shop}']
       interval: 5s
       timeout: 5s
       retries: 12
@@ -46,7 +28,6 @@ services:
           cpus: '0.5'
           memory: 512m
     restart: unless-stopped
-    logging: *default-logging
 
   redis:
     image: redis:7-alpine
@@ -66,7 +47,6 @@ services:
           cpus: '0.25'
           memory: 256m
     restart: unless-stopped
-    logging: *default-logging
 
   backend:
     image: node:22-alpine
@@ -79,25 +59,31 @@ services:
       AUTH_CORS: http://localhost:5173,http://localhost:9000,http://localhost:8000
       JWT_SECRET: ${JWT_SECRET:-local_dev_jwt}
       COOKIE_SECRET: ${COOKIE_SECRET:-local_dev_cookie}
+      PUBLISHABLE_KEY_FILE: /shared/publishable_key
     volumes:
       - .:/repo
-      # Named volumes shadow the bind mount so host node_modules (built for
-      # macOS) never leak into the Linux container.
       - backend_root_modules:/repo/node_modules
       - backend_app_modules:/repo/apps/backend/node_modules
+      - shared_keys:/shared
     ports:
       - '127.0.0.1:9000:9000'
     command: >
       sh -c "[ -e node_modules/.package-lock.json ] || npm ci --no-audit --no-fund;
+             npm exec --workspace=@dtc/backend -- medusa exec ./src/scripts/ensure-publishable-key.ts &&
              npm run dev --workspace=@dtc/backend"
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '--spider', '-q', 'http://127.0.0.1:9000/health']
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 180s
     deploy: *dev-resources
     restart: unless-stopped
-    logging: *default-logging
 
   storefront:
     image: node:22-alpine
@@ -105,22 +91,24 @@ services:
     environment:
       NEXT_PUBLIC_MEDUSA_BACKEND_URL: http://localhost:9000
       MEDUSA_BACKEND_URL: http://backend:9000
-      NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY: ${PUBLISHABLE_KEY:-}
       NEXT_PUBLIC_DEFAULT_REGION: ${DEFAULT_REGION:-ua}
     volumes:
       - .:/repo
       - storefront_root_modules:/repo/node_modules
       - storefront_app_modules:/repo/apps/storefront/node_modules
+      - shared_keys:/shared
     ports:
       - '127.0.0.1:8000:8000'
     command: >
       sh -c "[ -e node_modules/.package-lock.json ] || npm ci --workspace=@dtc/storefront --include-workspace-root --no-audit --no-fund;
+             until [ -s /shared/publishable_key ]; do echo 'waiting for publishable key...'; sleep 2; done;
+             export NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY=$$(cat /shared/publishable_key);
              npm run dev --workspace=@dtc/storefront"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     deploy: *dev-resources
     restart: unless-stopped
-    logging: *default-logging
 
 volumes:
   pgdata:
@@ -129,3 +117,4 @@ volumes:
   backend_app_modules:
   storefront_root_modules:
   storefront_app_modules:
+  shared_keys:

@@ -87,7 +87,7 @@ export default function ProductActions({
     }
 
     router.replace(pathname + "?" + params.toString())
-  }, [selectedVariant, isValidVariant])
+  }, [selectedVariant, isValidVariant, pathname, router, searchParams])
 
   const inStock = useMemo(() => {
     if (selectedVariant && !selectedVariant.manage_inventory) {

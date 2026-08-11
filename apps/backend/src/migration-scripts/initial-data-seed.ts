@@ -3,7 +3,6 @@ import {
   ContainerRegistrationKeys,
   ModuleRegistrationName,
   Modules,
-  ProductStatus,
 } from "@medusajs/framework/utils";
 import {
   createApiKeysWorkflow,
@@ -22,6 +21,9 @@ import {
   linkSalesChannelsToApiKeyWorkflow,
   linkSalesChannelsToStockLocationWorkflow,
 } from "@medusajs/medusa/core-flows";
+import { buildWeaponsProducts } from "./data/weapons-products";
+import { buildGearProducts } from "./data/gear-products";
+import { buildOpticsProducts } from "./data/optics-products";
 
 export default async function initial_data_seed({
   container,
@@ -274,7 +276,7 @@ export default async function initial_data_seed({
           is_active: true,
         },
         {
-          name: "Одяг та взуття",
+          name: "Оптика",
           is_active: true,
         },
       ],
@@ -285,9 +287,7 @@ export default async function initial_data_seed({
   const gearCategory = categoryResult.find(
     (cat) => cat.name === "Спорядження"
   )!;
-  const apparelCategory = categoryResult.find(
-    (cat) => cat.name === "Одяг та взуття"
-  )!;
+  const opticsCategory = categoryResult.find((cat) => cat.name === "Оптика")!;
 
   const { result: productOptionsResult } = await createProductOptionsWorkflow(
     container
@@ -296,11 +296,7 @@ export default async function initial_data_seed({
       product_options: [
         {
           title: "Калібр",
-          values: [".308 Win", "4,5 мм"],
-        },
-        {
-          title: "Розмір",
-          values: ["M", "41", "7"],
+          values: [".308 Win", "4,5 мм", ".22 LR", "12/76", "9 мм (9х19)", ".223 Rem"],
         },
         {
           title: "Колір",
@@ -315,333 +311,43 @@ export default async function initial_data_seed({
             "Brown",
           ],
         },
+        {
+          title: "Варіант",
+          values: ["Стандартний"],
+        },
       ],
     },
   });
   const caliberOption = productOptionsResult.find(
     (o) => o.title === "Калібр"
   )!;
-  const sizeOption = productOptionsResult.find((o) => o.title === "Розмір")!;
   const colorOption = productOptionsResult.find((o) => o.title === "Колір")!;
+  const standardOption = productOptionsResult.find(
+    (o) => o.title === "Варіант"
+  )!;
 
   await createProductsWorkflow(container).run({
     input: {
       products: [
-        // Weapons
-        {
-          title: "Карабін Howa 1500 HS Precision",
-          category_ids: [weaponsCategory.id],
-          description:
-            "Болтова гвинтівка з алюмінієвим шасі HS Precision, ствол 22\", калібр .308 Win. Призначена для точної стрільби на середні дистанції.",
-          handle: "howa-1500-hs-precision-308win",
-          weight: 3800,
-          status: ProductStatus.PUBLISHED,
-          shipping_profile_id: shippingProfile.id,
-          options: [{ id: caliberOption.id }],
-          variants: [
-            {
-              title: ".308 Win",
-              sku: "IBIS-HOWA1500-308",
-              options: { Калібр: ".308 Win" },
-              prices: [{ amount: 62930, currency_code: "uah" }],
-            },
-          ],
-          sales_channels: [{ id: defaultSalesChannel.id }],
-        },
-        {
-          title: "Карабін Savage 110 Ultralite SS",
-          category_ids: [weaponsCategory.id],
-          description:
-            'Полегшена болтова гвинтівка з карбоновим стволом та титановою ствольною коробкою, ствол 22", різьба 5/8"-24.',
-          handle: "savage-110-ultralite-ss-308win",
-          weight: 2900,
-          status: ProductStatus.PUBLISHED,
-          shipping_profile_id: shippingProfile.id,
-          options: [{ id: caliberOption.id }],
-          variants: [
-            {
-              title: ".308 Win",
-              sku: "IBIS-SAV110-308",
-              options: { Калібр: ".308 Win" },
-              prices: [{ amount: 70500, currency_code: "uah" }],
-            },
-          ],
-          sales_channels: [{ id: defaultSalesChannel.id }],
-        },
-        {
-          title: "Карабін Savage Impulse Big Game",
-          category_ids: [weaponsCategory.id],
-          description:
-            'Гвинтівка з прямим ходом затвора (straight-pull) для швидкої повторної стрільби, ствол 22", різьба 5/8"-24.',
-          handle: "savage-impulse-big-game-308win",
-          weight: 3400,
-          status: ProductStatus.PUBLISHED,
-          shipping_profile_id: shippingProfile.id,
-          options: [{ id: caliberOption.id }],
-          variants: [
-            {
-              title: ".308 Win",
-              sku: "IBIS-SAVIMP-308",
-              options: { Калібр: ".308 Win" },
-              prices: [{ amount: 64860, currency_code: "uah" }],
-            },
-          ],
-          sales_channels: [{ id: defaultSalesChannel.id }],
-        },
-        {
-          title: "Гвинтівка пневматична Optima Invader Auto PCP",
-          category_ids: [weaponsCategory.id],
-          description:
-            "Напівавтоматична PCP-гвинтівка калібру 4,5 мм з попереднім накачуванням повітря.",
-          handle: "optima-invader-auto-pcp-45",
-          weight: 3100,
-          status: ProductStatus.PUBLISHED,
-          shipping_profile_id: shippingProfile.id,
-          options: [{ id: caliberOption.id }],
-          variants: [
-            {
-              title: "4,5 мм",
-              sku: "IBIS-OPTINV-45",
-              options: { Калібр: "4,5 мм" },
-              prices: [{ amount: 19180, currency_code: "uah" }],
-            },
-          ],
-          sales_channels: [{ id: defaultSalesChannel.id }],
-        },
-        {
-          title: "Пістолет пневматичний Umarex Glock 19",
-          category_ids: [weaponsCategory.id],
-          description:
-            "Пневматичний пістолет-репліка Glock 19 калібру 4,5 мм ВВ із системою Blowback.",
-          handle: "umarex-glock-19-45bb",
-          weight: 650,
-          status: ProductStatus.PUBLISHED,
-          shipping_profile_id: shippingProfile.id,
-          options: [{ id: caliberOption.id }],
-          variants: [
-            {
-              title: "4,5 мм",
-              sku: "IBIS-UMGLOCK19-45",
-              options: { Калібр: "4,5 мм" },
-              prices: [{ amount: 6530, currency_code: "uah" }],
-            },
-          ],
-          sales_channels: [{ id: defaultSalesChannel.id }],
-        },
-        // Gear
-        {
-          title: "Підсумок Tasmanian Tiger IFAK Pouch",
-          category_ids: [gearCategory.id],
-          description:
-            "Медичний підсумок для розміщення аптечки першої допомоги (IFAK) з системою кріплення MOLLE.",
-          handle: "tasmanian-tiger-ifak-pouch-black",
-          weight: 200,
-          status: ProductStatus.PUBLISHED,
-          shipping_profile_id: shippingProfile.id,
-          options: [{ id: colorOption.id }],
-          variants: [
-            {
-              title: "Чорний",
-              sku: "IBIS-TT-IFAK-BLK",
-              options: { Колір: "Чорний" },
-              prices: [{ amount: 1350, currency_code: "uah" }],
-            },
-          ],
-          sales_channels: [{ id: defaultSalesChannel.id }],
-        },
-        {
-          title: "Кобура Front Line FL30 поясна",
-          category_ids: [gearCategory.id],
-          description:
-            "Поясна кобура для пістолета ПМ з фіксацією та зручним оперативним доступом.",
-          handle: "front-line-fl30-holster-pm",
-          weight: 150,
-          status: ProductStatus.PUBLISHED,
-          shipping_profile_id: shippingProfile.id,
-          options: [{ id: colorOption.id }],
-          variants: [
-            {
-              title: "Чорний",
-              sku: "IBIS-FL30-BLK",
-              options: { Колір: "Чорний" },
-              prices: [{ amount: 324, currency_code: "uah" }],
-            },
-          ],
-          sales_channels: [{ id: defaultSalesChannel.id }],
-        },
-        {
-          title: "Навушники Walker's Razor Carbon активні",
-          category_ids: [gearCategory.id],
-          description:
-            "Активні навушники для захисту слуху з підсиленням навколишніх звуків та карбоновим корпусом.",
-          handle: "walkers-razor-carbon",
-          weight: 300,
-          status: ProductStatus.PUBLISHED,
-          shipping_profile_id: shippingProfile.id,
-          options: [{ id: colorOption.id }],
-          variants: [
-            {
-              title: "Чорний",
-              sku: "IBIS-WALKRAZOR",
-              options: { Колір: "Чорний" },
-              prices: [{ amount: 4840, currency_code: "uah" }],
-            },
-          ],
-          sales_channels: [{ id: defaultSalesChannel.id }],
-        },
-        {
-          title: "Чохол для зброї Norica 133 см",
-          category_ids: [gearCategory.id],
-          description:
-            "Транспортувальний чохол для зброї довжиною 133 см з м'якою прокладкою.",
-          handle: "norica-gun-case-133",
-          weight: 900,
-          status: ProductStatus.PUBLISHED,
-          shipping_profile_id: shippingProfile.id,
-          options: [{ id: colorOption.id }],
-          variants: [
-            {
-              title: "Чорний",
-              sku: "IBIS-NORICA-133",
-              options: { Колір: "Чорний" },
-              prices: [{ amount: 1430, currency_code: "uah" }],
-            },
-          ],
-          sales_channels: [{ id: defaultSalesChannel.id }],
-        },
-        {
-          title: "Кавер Defcon 5 Helmet Cover mod.Fast",
-          category_ids: [gearCategory.id],
-          description:
-            "Кавер на шолом стандарту FAST з кріпленнями для додаткових аксесуарів.",
-          handle: "defcon5-helmet-cover-fast-coyote",
-          weight: 120,
-          status: ProductStatus.PUBLISHED,
-          shipping_profile_id: shippingProfile.id,
-          options: [{ id: colorOption.id }],
-          variants: [
-            {
-              title: "Койот",
-              sku: "IBIS-DEFCON5-HC-COY",
-              options: { Колір: "Койот" },
-              prices: [{ amount: 370, currency_code: "uah" }],
-            },
-          ],
-          sales_channels: [{ id: defaultSalesChannel.id }],
-        },
-        // Clothing and footwear
-        {
-          title: "Рукавички Mechanix Original",
-          category_ids: [apparelCategory.id],
-          description:
-            "Тактичні рукавички з еластичними вставками та посиленою долонею для щоденного використання.",
-          handle: "mechanix-original-m-olive",
-          weight: 150,
-          status: ProductStatus.PUBLISHED,
-          shipping_profile_id: shippingProfile.id,
-          options: [{ id: sizeOption.id }, { id: colorOption.id }],
-          variants: [
-            {
-              title: "M / Olive Drab",
-              sku: "IBIS-MECH-ORIG-M-OD",
-              options: { Розмір: "M", Колір: "Olive Drab" },
-              prices: [{ amount: 1170, currency_code: "uah" }],
-            },
-          ],
-          sales_channels: [{ id: defaultSalesChannel.id }],
-        },
-        {
-          title: "Набір футболок Pentagon Orpheus",
-          category_ids: [apparelCategory.id],
-          description:
-            "Комплект бавовняних футболок повсякденного крою, розмір M.",
-          handle: "pentagon-orpheus-tshirts-m",
-          weight: 450,
-          status: ProductStatus.PUBLISHED,
-          shipping_profile_id: shippingProfile.id,
-          options: [{ id: sizeOption.id }, { id: colorOption.id }],
-          variants: [
-            {
-              title: "M / Чорний",
-              sku: "IBIS-PENT-ORPH-M-BLK",
-              options: { Розмір: "M", Колір: "Чорний" },
-              prices: [{ amount: 1290, currency_code: "uah" }],
-            },
-            {
-              title: "M / Білий",
-              sku: "IBIS-PENT-ORPH-M-WHT",
-              options: { Розмір: "M", Колір: "Білий" },
-              prices: [{ amount: 1290, currency_code: "uah" }],
-            },
-            {
-              title: "M / Синій",
-              sku: "IBIS-PENT-ORPH-M-BLU",
-              options: { Розмір: "M", Колір: "Синій" },
-              prices: [{ amount: 1290, currency_code: "uah" }],
-            },
-          ],
-          sales_channels: [{ id: defaultSalesChannel.id }],
-        },
-        {
-          title: "Костюм Defcon 5 Sniper Vest+Pants Kit",
-          category_ids: [apparelCategory.id],
-          description:
-            "Камуфльований костюм для маскування: жилет і штани, розмір M.",
-          handle: "defcon5-sniper-vest-pants-kit-m",
-          weight: 1200,
-          status: ProductStatus.PUBLISHED,
-          shipping_profile_id: shippingProfile.id,
-          options: [{ id: sizeOption.id }, { id: colorOption.id }],
-          variants: [
-            {
-              title: "M / Камуфляж",
-              sku: "IBIS-DEFCON5-SNIPER-M",
-              options: { Розмір: "M", Колір: "Камуфляж" },
-              prices: [{ amount: 19320, currency_code: "uah" }],
-            },
-          ],
-          sales_channels: [{ id: defaultSalesChannel.id }],
-        },
-        {
-          title: "Кросівки Pentagon Hybrid 2.0",
-          category_ids: [apparelCategory.id],
-          description:
-            "Тактичні кросівки з дихаючим верхом та зносостійкою підошвою, розмір 41.",
-          handle: "pentagon-hybrid-2-shoes-41",
-          weight: 800,
-          status: ProductStatus.PUBLISHED,
-          shipping_profile_id: shippingProfile.id,
-          options: [{ id: sizeOption.id }, { id: colorOption.id }],
-          variants: [
-            {
-              title: "41 / Сірий",
-              sku: "IBIS-PENT-HYBRID2-41",
-              options: { Розмір: "41", Колір: "Сірий" },
-              prices: [{ amount: 3630, currency_code: "uah" }],
-            },
-          ],
-          sales_channels: [{ id: defaultSalesChannel.id }],
-        },
-        {
-          title: "Черевики AKU Griffon Combat GTX",
-          category_ids: [apparelCategory.id],
-          description:
-            "Бойові черевики з мембраною GORE-TEX для захисту від вологи, розмір 7 (US).",
-          handle: "aku-griffon-combat-gtx-7-brown",
-          weight: 1100,
-          status: ProductStatus.PUBLISHED,
-          shipping_profile_id: shippingProfile.id,
-          options: [{ id: sizeOption.id }, { id: colorOption.id }],
-          variants: [
-            {
-              title: "7 / Brown",
-              sku: "IBIS-AKU-GRIFFON-7-BRN",
-              options: { Розмір: "7", Колір: "Brown" },
-              prices: [{ amount: 8640, currency_code: "uah" }],
-            },
-          ],
-          sales_channels: [{ id: defaultSalesChannel.id }],
-        },
+        ...buildWeaponsProducts({
+          categoryId: weaponsCategory.id,
+          shippingProfileId: shippingProfile.id,
+          salesChannelId: defaultSalesChannel.id,
+          caliberOptionId: caliberOption.id,
+        }),
+        ...buildGearProducts({
+          categoryId: gearCategory.id,
+          shippingProfileId: shippingProfile.id,
+          salesChannelId: defaultSalesChannel.id,
+          colorOptionId: colorOption.id,
+          standardOptionId: standardOption.id,
+        }),
+        ...buildOpticsProducts({
+          categoryId: opticsCategory.id,
+          shippingProfileId: shippingProfile.id,
+          salesChannelId: defaultSalesChannel.id,
+          standardOptionId: standardOption.id,
+        }),
       ],
     },
   });

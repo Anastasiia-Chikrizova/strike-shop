@@ -1,9 +1,6 @@
-# Local/manual build from source. The deploy stack that only pulls images is
-# docker-compose.staging.yml; hot-reload development is docker-compose.dev.yml.
-
 name: strike-shop-${APP_ENV:?set APP_ENV=staging|prod}
 
-# 50m x 3 files per service, matching docker-compose.staging.yml.
+
 x-logging: &default-logging
   driver: ${LOG_DRIVER:-json-file}
   options:
@@ -81,8 +78,6 @@ services:
       timeout: 5s
       retries: 12
       start_period: 40s
-    # Limits apply to the running container, not to the build. Same values as
-    # staging so local behaviour matches what the server will do.
     deploy:
       resources:
         limits:

@@ -145,6 +145,11 @@ const OptionsPicker = ({
     }
 
     fetchOptions()
+    // productsIds/selectedGroupIds are read above for their current values;
+    // the deps use their joined-string keys instead of the raw arrays so a
+    // new array reference with the same contents (common from callers that
+    // build the array inline) doesn't trigger a refetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categoryId, collectionId, productsIdsKey, selectedGroupIdsKey])
 
   useEffect(() => {

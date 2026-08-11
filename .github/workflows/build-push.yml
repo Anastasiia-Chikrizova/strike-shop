@@ -1,6 +1,7 @@
 name: build & push to GHCR
 
 on:
+  pull_request:
   push:
     branches: [dev, main]
   workflow_dispatch:
@@ -12,7 +13,7 @@ on:
         default: staging
 
 concurrency:
-  group: build-${{ github.ref }}
+  group: build-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -29,10 +30,8 @@ jobs:
       storefront_changed: ${{ steps.filter.outputs.storefront }}
     steps:
       - uses: actions/checkout@v7
-        if: github.event_name == 'push'
 
       - id: filter
-        if: github.event_name == 'push'
         uses: dorny/paths-filter@v4
         with:
           filters: |
@@ -50,15 +49,57 @@ jobs:
           echo "app_env=${{ inputs.environment || (github.ref_name == 'main' && 'prod') || 'staging' }}" >> "$GITHUB_OUTPUT"
           echo "img_prefix=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
 
-  # Lint + typecheck. Both build jobs need it, so a red gate means nothing is
-  # pushed to GHCR. Defined once in quality.yml and reused here rather than
-  # copied, so the PR gate and the release gate cannot drift apart.
-  quality:
-    uses: ./.github/workflows/quality.yml
+  # Lint + typecheck, split per app and gated on the same path filter as the
+  # build jobs below — a PR touching only the storefront doesn't wait on the
+  # backend's checks and vice versa. Runs on every PR; the build jobs further
+  # down only run on push/workflow_dispatch, so this is the only check PRs get.
+  #
+  # The storefront build itself cannot be trusted to catch anything:
+  # apps/storefront/next.config.js sets `eslint.ignoreDuringBuilds` and
+  # `typescript.ignoreBuildErrors`, deliberately, to keep `next build` fast.
+  # This is the only place type errors and lint errors surface for it.
+  lint-backend:
+    needs: setup
+    if: needs.setup.outputs.backend_changed == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Lint
+        run: npx turbo lint --filter=@dtc/backend
+      - name: Typecheck
+        run: npx turbo typecheck --filter=@dtc/backend
+
+  lint-storefront:
+    needs: setup
+    if: needs.setup.outputs.storefront_changed == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Lint
+        run: npx turbo lint --filter=@dtc/storefront
+      # The storefront tsconfig includes .next/types, which holds the
+      # generated typed-route definitions. `next typegen` writes them without
+      # a full build; without it tsc reports phantom errors on typed
+      # <Link href>. The publishable key is a placeholder purely to satisfy
+      # check-env-variables.js — typegen never calls the backend.
+      - name: Typecheck
+        env:
+          NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY: pk_ci_placeholder
+        run: npx turbo typecheck --filter=@dtc/storefront
 
   backend:
-    needs: [setup, quality]
-    if: github.event_name == 'workflow_dispatch' || needs.setup.outputs.backend_changed == 'true'
+    needs: [setup, lint-backend]
+    if: github.event_name != 'pull_request' && (github.event_name == 'workflow_dispatch' || needs.setup.outputs.backend_changed == 'true')
     # arm64 runner, so the arm64 image is built natively. Cross-building it on
     # an amd64 runner would fall back to QEMU and take an order of magnitude
     # longer. These runners are free for public repositories.
@@ -99,8 +140,8 @@ jobs:
           cache-to: type=gha,scope=backend-${{ env.APP_ENV }},mode=max
 
   storefront:
-    needs: [setup, quality]
-    if: github.event_name == 'workflow_dispatch' || needs.setup.outputs.storefront_changed == 'true'
+    needs: [setup, lint-storefront]
+    if: github.event_name != 'pull_request' && (github.event_name == 'workflow_dispatch' || needs.setup.outputs.storefront_changed == 'true')
     # Native arm64, same reasoning as the backend job above.
     runs-on: ubuntu-24.04-arm
     environment: ${{ needs.setup.outputs.app_env }}
@@ -149,28 +190,26 @@ jobs:
         run: rm -f /tmp/storefront.env
 
   summary:
-    needs: [setup, quality, backend, storefront]
-    if: always()
+    needs: [setup, lint-backend, lint-storefront, backend, storefront]
+    if: always() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-24.04
     steps:
       - name: What was built
         run: |
           echo "### ${{ needs.setup.outputs.app_env }} → ${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
-          # A red gate skips both build jobs. Without this branch the summary
-          # would blame "no changes" for what is actually a blocked release.
-          if [ "${{ needs.quality.result }}" != "success" ]; then
-            echo "nothing built: quality gate ${{ needs.quality.result }}" >> "$GITHUB_STEP_SUMMARY"
+          if [ "${{ needs.backend.result }}" = "success" ]; then
+            echo "${{ needs.setup.outputs.img_prefix }}/strike-backend:${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
+          elif [ "${{ needs['lint-backend'].result }}" = "failure" ]; then
+            echo "backend: skipped, lint/typecheck gate failed" >> "$GITHUB_STEP_SUMMARY"
           else
-            if [ "${{ needs.backend.result }}" = "success" ]; then
-              echo "${{ needs.setup.outputs.img_prefix }}/strike-backend:${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
-            else
-              echo "backend: skipped, no changes under apps/backend" >> "$GITHUB_STEP_SUMMARY"
-            fi
-            if [ "${{ needs.storefront.result }}" = "success" ]; then
-              echo "${{ needs.setup.outputs.img_prefix }}/strike-storefront:${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
-            else
-              echo "storefront: skipped, no changes under apps/storefront" >> "$GITHUB_STEP_SUMMARY"
-            fi
+            echo "backend: skipped, no changes under apps/backend" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ "${{ needs.storefront.result }}" = "success" ]; then
+            echo "${{ needs.setup.outputs.img_prefix }}/strike-storefront:${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
+          elif [ "${{ needs['lint-storefront'].result }}" = "failure" ]; then
+            echo "storefront: skipped, lint/typecheck gate failed" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "storefront: skipped, no changes under apps/storefront" >> "$GITHUB_STEP_SUMMARY"
           fi
           echo '```' >> "$GITHUB_STEP_SUMMARY"

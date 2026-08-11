@@ -2,16 +2,15 @@
 
 | File | What it is |
 | --- | --- |
-| [`.github/workflows/quality.yml`](../.github/workflows/quality.yml) | lint + typecheck; runs on PRs and is called by the build |
-| [`.github/workflows/build-push.yml`](../.github/workflows/build-push.yml) | builds both images for `linux/arm64` → GHCR |
-| [`docker-compose.staging.yml`](../docker-compose.staging.yml) | deploy stack: only `image:`, no `build:` |
+| [`.github/workflows/build-push.yml`](../.github/workflows/build-push.yml) | lint + typecheck on PRs (per app, path-filtered); builds both images for `linux/arm64` → GHCR on push/dispatch |
+| [`docker-compose.deploy.yml`](../docker-compose.deploy.yml) | deploy stack: only `image:`, no `build:` |
 | [`Caddyfile`](Caddyfile) | reverse proxy on plain HTTP — TLS terminates at the Cloudflare edge |
 | [`deploy.sh`](deploy.sh) | pull → migrate → up → wait for healthy |
 | `*.env.example` | templates; the real files live in `/etc/strike-shop/` and never go into git |
 
-The `docker-compose.yml` in the repo root builds from source (local/manual),
-`docker-compose.dev.yml` is for development. The server only needs
-`docker-compose.staging.yml`.
+The `docker-compose.local.yml` in the repo root builds from source
+(local/manual), `docker-compose.dev.yml` is for development. The server only
+needs `docker-compose.deploy.yml`.
 
 ---
 
@@ -36,7 +35,7 @@ sudo usermod -aG docker "$USER"   # log back in afterward
 ```
 
 Public access goes through Cloudflare Tunnel (`cloudflared`), so 80/443 don't
-need to be opened externally — `caddy` in `docker-compose.staging.yml` only
+need to be opened externally — `caddy` in `docker-compose.deploy.yml` only
 listens for what the tunnel forwards to it, and the tunnel itself is set up
 separately (TODO: document `cloudflared` as a service/container here once
 that's settled).
@@ -76,8 +75,9 @@ text. The workflow picks the Environment based on the branch: `dev` →
 staging, `main` → prod. Those two are the only long-lived branches; `main`
 is the repository default.
 
-Every build first calls the `quality` workflow (lint + typecheck) and both
-image jobs `needs` it, so a red gate pushes nothing to GHCR. It matters here
+Each image job `needs` its own `lint-backend`/`lint-storefront` job (lint +
+typecheck, path-filtered — a PR touching only the storefront doesn't wait on
+the backend's checks), so a red gate pushes nothing to GHCR. It matters here
 more than usual: `apps/storefront/next.config.js` sets
 `typescript.ignoreBuildErrors` and `eslint.ignoreDuringBuilds`, so the image
 build itself would happily ship code that does not typecheck.
@@ -97,7 +97,7 @@ once. So the backend goes up first, and only then is the storefront built.
 ```bash
 cd /opt/strike-shop
 set -a; . /etc/strike-shop/stack.env; set +a
-compose() { docker compose --env-file /etc/strike-shop/stack.env -f docker-compose.staging.yml "$@"; }
+compose() { docker compose --env-file /etc/strike-shop/stack.env -f docker-compose.deploy.yml "$@"; }
 
 compose pull backend
 compose up -d postgres redis
@@ -166,7 +166,7 @@ they exist is sizing: without them one runaway Node process takes the whole
 box down with it, and there is no defensible way to pick an instance type —
 only guessing with a safety margin, which means paying for idle RAM.
 
-Defaults in `docker-compose.staging.yml`, all overridable from `stack.env`:
+Defaults in `docker-compose.deploy.yml`, all overridable from `stack.env`:
 
 | Service | CPUs | Memory |
 | --- | --- | --- |
