@@ -36,7 +36,7 @@ function applyTheme(value: ThemeValue) {
   html.style.colorScheme = value
   html.setAttribute("data-mode", value)
 
-  window.getComputedStyle(css).opacity
+  void window.getComputedStyle(css).opacity
   document.head.removeChild(css)
 }
 
