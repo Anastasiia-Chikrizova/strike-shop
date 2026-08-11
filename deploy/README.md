@@ -2,8 +2,7 @@
 
 | File | What it is |
 | --- | --- |
-| [`.github/workflows/quality.yml`](../.github/workflows/quality.yml) | lint + typecheck; runs on PRs and is called by the build |
-| [`.github/workflows/build-push.yml`](../.github/workflows/build-push.yml) | builds both images for `linux/arm64` → GHCR |
+| [`.github/workflows/build-push.yml`](../.github/workflows/build-push.yml) | lint + typecheck on PRs (per app, path-filtered); builds both images for `linux/arm64` → GHCR on push/dispatch |
 | [`docker-compose.deploy.yml`](../docker-compose.deploy.yml) | deploy stack: only `image:`, no `build:` |
 | [`Caddyfile`](Caddyfile) | reverse proxy on plain HTTP — TLS terminates at the Cloudflare edge |
 | [`deploy.sh`](deploy.sh) | pull → migrate → up → wait for healthy |
@@ -76,8 +75,9 @@ text. The workflow picks the Environment based on the branch: `dev` →
 staging, `main` → prod. Those two are the only long-lived branches; `main`
 is the repository default.
 
-Every build first calls the `quality` workflow (lint + typecheck) and both
-image jobs `needs` it, so a red gate pushes nothing to GHCR. It matters here
+Each image job `needs` its own `lint-backend`/`lint-storefront` job (lint +
+typecheck, path-filtered — a PR touching only the storefront doesn't wait on
+the backend's checks), so a red gate pushes nothing to GHCR. It matters here
 more than usual: `apps/storefront/next.config.js` sets
 `typescript.ignoreBuildErrors` and `eslint.ignoreDuringBuilds`, so the image
 build itself would happily ship code that does not typecheck.
