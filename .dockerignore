@@ -25,3 +25,5 @@ docker-compose*.yml
 **/*.tsbuildinfo
 **/coverage
 .run
+/infra/eks-runbook.ru.md
+/infra/README.ru.md
