@@ -27,7 +27,7 @@ services:
           memory: ${POSTGRES_MEMORY:-768m}
         reservations:
           memory: ${POSTGRES_MEMORY_MIN:-256m}
-    restart: unless-stoppedоно 
+    restart: unless-stopped
     logging: *default-logging
 
   redis:
