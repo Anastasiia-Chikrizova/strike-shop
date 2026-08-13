@@ -1,6 +1,0 @@
-name: deploy.yml
-on:
-  push:
-  paths: ['infra/**']
-
-jobs:

@@ -60,6 +60,10 @@ yarn-debug.log*
 yarn-error.log*
 
 # Local env files
+# Any *.env, not just dotfiles: real values end up in names like
+# backend.env or ff.env. The .example templates are tracked (they do not
+# end in .env).
+*.env
 **/.env
 **/.env.local
 **/.env.development.local

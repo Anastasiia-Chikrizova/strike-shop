@@ -1,8 +1,13 @@
 # Infrastructure
 
-Terraform for the AWS side of strike-shop. Nothing here has been applied yet.
+Terraform for the AWS side of strike-shop.
 
-Everything in this directory can be written, validated, linted and
+`environments/prod` is applied and serving traffic: one `t4g.small` behind a
+Cloudflare Tunnel at [strike-shop.win](https://strike-shop.win), admin at
+[api.strike-shop.win/app](https://api.strike-shop.win/app). `environments/eks`
+is not written yet.
+
+Everything in this directory can still be written, validated, linted and
 security-scanned without touching AWS. See "Working without AWS" below.
 
 ## Budget
@@ -31,6 +36,7 @@ not because the credit is tight.
 ```
 infra/
 ├── terraform/
+│   ├── bootstrap/          S3 bucket for state — applied once, state stays local
 │   ├── modules/
 │   │   ├── network/        VPC, subnet, IGW, routes, security group
 │   │   ├── app-instance/   EC2 running docker compose (always-on, cheap)
@@ -155,10 +161,23 @@ tflint --recursive
 trivy config infra/
 ```
 
-CI runs exactly these on every PR — see
-[`.github/workflows/terraform.yml`](../.github/workflows/terraform.yml). There
-are no AWS secrets in the repository and the workflow requests none, so it
-cannot spend money by accident.
+CI runs exactly these on every PR touching `infra/**` — see
+[`.github/workflows/terraform.yml`](../.github/workflows/terraform.yml). It
+requests no AWS credentials and there are none in the repository, so a pull
+request cannot spend money by accident.
+
+Two knobs there worth knowing about:
+
+- lint config lives in [`terraform/.tflint.hcl`](terraform/.tflint.hcl) and
+  turns half of the code-review checklist (typed and documented variables,
+  documented outputs, naming, unused declarations) into something executable;
+- the trivy step **fails the build** on anything HIGH or CRITICAL. Three
+  findings are accepted on purpose and listed in
+  [`.trivyignore`](.trivyignore) with the reasoning: SSE-S3 instead of a KMS
+  customer managed key on the state bucket (`AVD-AWS-0132`), unrestricted
+  egress (`AVD-AWS-0104`) and public IPs on the subnet (`AVD-AWS-0164`). Two
+  of the three are cost trades that stop being defensible outside a demo, so
+  the list is worth re-reading whenever the topology changes.
 
 `terraform plan` is the first command that needs an account, because data
 sources make real API calls. That is the boundary: everything up to `validate`
@@ -175,12 +194,19 @@ printf 'plugin_cache_dir = "$HOME/.terraform.d/plugin-cache"\n' >> ~/.terraformr
 
 ## State
 
-`backend.tf` in each root module is committed **commented out**, because the S3
-bucket does not exist yet. Chicken-and-egg: the backend needs a bucket, the
-bucket needs an apply.
+State lives in `s3://strike-shop-tfstate-814454905474`, one key per root
+module. The bucket has versioning (the undo button for a corrupted state) and
+`prevent_destroy`.
 
-Order when the time comes: apply once with local state to create the bucket,
-then uncomment the backend and `terraform init -migrate-state`.
+The bucket itself is created by `terraform/bootstrap`, a root module whose own
+state stays **local and is never migrated**. That asymmetry is deliberate:
+a bucket cannot be the backend for the configuration that creates it, and
+keeping it in `prod` would mean `terraform destroy` there trying to delete the
+bucket holding its own state. Four resources, recreatable by hand if the local
+state is ever lost.
+
+`environments/eks/backend.tf` is still committed commented out — fill in the
+same bucket with its own `key` when that environment gets written.
 
 Note there is no DynamoDB table. Terraform 1.11+ locks state natively through
 S3 conditional writes (`use_lockfile = true`); the `dynamodb_table` argument is
@@ -189,12 +215,27 @@ deprecated. One less resource to pay for and manage.
 `.terraform.lock.hcl` **is** committed — it pins provider hashes, same role as
 `package-lock.json`. `*.tfvars` is not: it may hold real values.
 
-## Before the first apply
+## Cost guardrails (done before the first apply)
 
-1. **Verify the Budget thresholds** — the budget task is done, so an alert
-   exists; make sure it fires at something useful ($20 / $50 / $100) and goes
-   to an address that gets read.
-2. Region: `eu-north-1` (Stockholm) — cheapest EU region and covered by the
-   t4g free trial. Note the onboarding tasks were done in `us-east-1` and
-   `eu-west-1`; nothing from them should still exist, but the sweep is
-   per-region, so check there rather than only in `eu-north-1`.
+Two budgets, which is also the free tier — a third costs $0.02/day:
+
+- **`month`** — $15/month, the one that actually watches spend. Alerts at
+  actual 50% and 80%, and **forecasted 100%**, which is the one that catches a
+  cluster left running overnight: it fires on day two instead of day five.
+- **`My Zero-Spend Budget`** — the account default, $1/month. Useless as a
+  spend alarm while credits last, but it is a decent "the credits ran out"
+  tripwire, so it stays.
+
+The non-obvious part: a budget counts credits as negative charges by default,
+so it reads $0 for as long as the $200 covers the bill. `month` filters the
+charge types down to `Usage`, `Tax`, `Support`, the two reservation fees and
+out-of-cycle charges — `Credit` and `Refund` are excluded, which is what makes
+it show gross spend. Verify with `--show-filter-expression`; without that flag
+`describe-budget` reports no filters at all and looks misconfigured.
+
+Region: `eu-north-1` (Stockholm) — cheapest EU region and covered by the t4g
+free trial. The onboarding tasks ran in `us-east-1` and `eu-west-1`, and they
+did leave something behind: two manual RDS snapshots (~$0.11/month), found
+only because the fixed budget started showing a non-zero number. Manual
+snapshots outlive the database they came from. Sweep per-region, not just
+`eu-north-1`.
