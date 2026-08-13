@@ -39,6 +39,8 @@ resource "aws_instance" "app" {
   user_data = templatefile("${path.module}/user_data.sh.tftpl", {
     repo_url     = var.repo_url
     swap_size_gb = var.swap_size_gb
+    region       = var.region
+    ssm_prefix   = var.ssm_parameter_prefix
   })
 
   # Required. T4g defaults to "unlimited", which bills surplus CPU credits even
@@ -67,4 +69,35 @@ resource "aws_instance" "app" {
   lifecycle {
     ignore_changes = [ami]
   }
+}
+
+# The Postgres data directory lives here rather than on the root volume, which
+# is delete_on_termination. That is the difference between an instance that can
+# be replaced at will and one that takes the database with it — including the
+# publishable key, which the storefront bundle is built against.
+#
+# The AZ comes from the network module, not from the instance: making the
+# volume depend on the instance would put it up for replacement whenever the
+# instance is replaced, and prevent_destroy would then block the apply.
+resource "aws_ebs_volume" "data" {
+  availability_zone = var.availability_zone
+  size              = var.data_volume_size
+  type              = "gp3"
+  encrypted         = true
+
+  tags = {
+    Name = "${local.name_prefix}-data"
+  }
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+resource "aws_volume_attachment" "data" {
+  # Amazon Linux ships udev rules that symlink this name to the actual NVMe
+  # device, so user_data can rely on /dev/sdf existing.
+  device_name = "/dev/sdf"
+  volume_id   = aws_ebs_volume.data.id
+  instance_id = aws_instance.app.id
 }

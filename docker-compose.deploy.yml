@@ -14,7 +14,11 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB:-medusa}
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      # A path here (e.g. /mnt/data/pgdata) bind-mounts a directory on a
+      # separate EBS volume, so the database survives the instance being
+      # replaced. Left unset, it falls back to a named volume on the root
+      # disk — fine locally, data loss on termination in AWS.
+      - ${POSTGRES_DATA:-pgdata}:/var/lib/postgresql/data
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-medusa} -d ${POSTGRES_DB:-medusa}']
       interval: 5s

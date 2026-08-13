@@ -1,3 +1,19 @@
+variable "availability_zone" {
+  description = "AZ to place the data volume in. Must match the subnet's AZ — EBS cannot cross one."
+  type        = string
+}
+
+variable "data_volume_size" {
+  description = "Size in GB of the EBS volume holding the Postgres data directory."
+  type        = number
+  default     = 10
+
+  validation {
+    condition     = var.data_volume_size >= 5 && var.data_volume_size <= 100
+    error_message = "Data volume must be between 5 and 100 GB."
+  }
+}
+
 variable "environment" {
   description = "Environment name, used in resource names."
   type        = string
@@ -24,6 +40,11 @@ variable "project" {
   type        = string
 }
 
+variable "region" {
+  description = "AWS region. Passed to the AWS CLI calls in user_data, which run before any profile or config exists on the instance."
+  type        = string
+}
+
 variable "repo_url" {
   description = "Git repository cloned to /opt/strike-shop by user_data, for the compose file and deploy script."
   type        = string
@@ -44,6 +65,12 @@ variable "root_volume_size" {
 variable "security_group_id" {
   description = "ID of the security group from the network module."
   type        = string
+}
+
+variable "ssm_parameter_prefix" {
+  description = "Path prefix of the SecureString parameters holding the env files. user_data reads <prefix>/{stack,backend,storefront}_env at boot."
+  type        = string
+  default     = "/strike-shop/prod"
 }
 
 variable "subnet_id" {
