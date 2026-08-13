@@ -57,9 +57,17 @@ it in `apps/storefront/.env.local`.
 
 ## Deployment
 
-Staging runs on a Linux VM (arm64 — AWS Graviton, `t4g`), exposed via
-Cloudflare Tunnel. Images are built by GitHub Actions and pushed to GHCR.
-Steps, server setup, and secrets are described in
+Live at **[strike-shop.win](https://strike-shop.win)**, admin at
+[api.strike-shop.win/app](https://api.strike-shop.win/app).
+
+It runs on a single AWS Graviton instance (`t4g.small`, arm64) provisioned by
+Terraform — see [infra/README.md](infra/README.md) — with the whole stack in
+Docker Compose behind a Cloudflare Tunnel. Nothing is exposed to the internet
+directly: the security group has no inbound rules at all, and shell access
+goes through AWS Session Manager rather than SSH.
+
+Images are built for `linux/arm64` by GitHub Actions and pushed to GHCR.
+Server setup, secrets and the rollout procedure are in
 [deploy/README.md](deploy/README.md).
 
 ## Payments

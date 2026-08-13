@@ -1,0 +1,29 @@
+# Accepted findings. Each line is a deliberate architectural decision, not a
+# check that was silenced to make CI green. Anything not listed here fails the
+# build — see .github/workflows/terraform.yml.
+#
+# Re-check this list whenever the budget or the topology changes: every entry
+# here is a trade against cost, and two of the three stop being defensible the
+# moment this stops being a $200 demo.
+
+# AWS-0132 — state bucket uses SSE-S3 (AES256), not a customer managed KMS key.
+# A CMK is ~$1/month plus per-request charges, for a bucket holding a few
+# kilobytes of JSON. Key rotation and per-key audit trails are what a CMK buys,
+# and neither changes the blast radius here: whoever can read the bucket can
+# already read the state through Terraform.
+AVD-AWS-0132
+
+# AWS-0104 — security group allows egress to 0.0.0.0/0.
+# The SSM agent and cloudflared both dial *out*, to rotating AWS and Cloudflare
+# endpoints; image pulls go to GHCR. Restricting this properly means VPC
+# endpoints (interface endpoints are ~$7/month each, more than the instance).
+# Note the other half of the trade: there is not a single ingress rule, so
+# nothing can reach in.
+AVD-AWS-0104
+
+# AWS-0164 — subnet assigns public IPs on launch.
+# There is no NAT gateway (~$33/month, five times the entire app budget), so a
+# public IP is the only way out for an instance that must reach SSM, GHCR and
+# Cloudflare. The IPv4 itself costs $3.65/month. Nothing listens on it: no
+# ingress rules, no open ports, no SSH.
+AVD-AWS-0164

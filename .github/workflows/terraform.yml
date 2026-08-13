@@ -1,0 +1,85 @@
+name: terraform checks
+
+# Everything here runs without AWS credentials and without touching the state
+# bucket: fmt, validate, lint and a config scan. `terraform plan` would need an
+# account, so it deliberately does not happen in CI — a pull request cannot
+# spend money.
+on:
+  pull_request:
+    paths: ['infra/**', '.github/workflows/terraform.yml']
+  push:
+    branches: [main]
+    paths: ['infra/**', '.github/workflows/terraform.yml']
+  workflow_dispatch:
+
+concurrency:
+  group: terraform-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        working-directory: infra/terraform
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          # The lock files pin the provider; this pins the CLI that reads them.
+          terraform_version: 1.15.8
+          terraform_wrapper: false
+
+      - name: Format
+        run: terraform fmt -check -recursive -diff
+
+      # Every directory is initialised on its own: modules are not root modules,
+      # so `terraform validate` has to be run from inside each one. -backend=false
+      # keeps it away from S3 and from credentials.
+      - name: Validate
+        run: |
+          failed=0
+          for dir in modules/*/ environments/*/ bootstrap/; do
+            [ -n "$(find "$dir" -maxdepth 1 -name '*.tf' -print -quit)" ] || continue
+            echo "::group::$dir"
+            (cd "$dir" && terraform init -backend=false -input=false -no-color \
+              && terraform validate -no-color) || failed=1
+            echo "::endgroup::"
+          done
+          exit $failed
+
+      - uses: terraform-linters/setup-tflint@v6
+        with:
+          tflint_version: latest
+
+      # --config is absolute on purpose: --recursive chdirs into every module,
+      # and a relative path would resolve against the wrong directory, silently
+      # dropping the aws ruleset and linting with core rules only.
+      - name: Lint
+        run: |
+          tflint --init --config "$PWD/.tflint.hcl"
+          tflint --recursive --format compact --config "$PWD/.tflint.hcl"
+        env:
+          # Raises the anonymous GitHub API rate limit while tflint downloads
+          # its ruleset. Read-only, issued per run.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Fails the build on anything HIGH or CRITICAL. The three findings this
+      # configuration deliberately accepts are listed, with reasons, in
+      # infra/.trivyignore — add to that file only with an argument, never to
+      # make the build green.
+      - name: Scan config
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: config
+          scan-ref: infra
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+          trivyignores: infra/.trivyignore
