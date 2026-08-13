@@ -33,8 +33,48 @@ sysctl -p /etc/sysctl.d/99-swappiness.conf
 git clone ${repo_url} /opt/strike-shop
 chown -R ec2-user:ec2-user /opt/strike-shop
 
-# Secrets live here, outside the repository, root-owned. They are placed by
-# hand over SSM on first setup — deliberately not by user_data, which is
-# readable from the instance through IMDS.
+# --- Data volume -------------------------------------------------------------
+# Separate EBS volume for the Postgres data directory. Formatted only if it has
+# no filesystem yet, so a replaced instance picks up the existing database
+# instead of wiping it.
+DEV=/dev/sdf
+for _ in $(seq 1 30); do
+  [ -b "$DEV" ] && break
+  sleep 2
+done
+
+# XFS, not ext4: no lost+found, so the mount point stays empty and Postgres
+# does not mistake it for an existing data directory.
+blkid "$DEV" >/dev/null 2>&1 || mkfs.xfs "$DEV"
+
+mkdir -p /mnt/data
+grep -q "^$DEV " /etc/fstab || echo "$DEV /mnt/data xfs defaults,nofail 0 2" >> /etc/fstab
+mount -a
+mkdir -p /mnt/data/pgdata
+
+# --- Secrets ---------------------------------------------------------------
+# Fetched at boot with the instance's own role, never baked into user_data:
+# user_data is readable from inside the instance through IMDS, so anything
+# written here would be a secret in plain sight.
+#
+# umask before the redirects, not chmod after: between creating a file and
+# chmod-ing it there is a window where it is world-readable.
+umask 077
 mkdir -p /etc/strike-shop
-chmod 700 /etc/strike-shop
+
+for name in stack backend storefront; do
+  aws ssm get-parameter \
+    --region ${region} \
+    --name "${ssm_prefix}/$${name}_env" \
+    --with-decryption \
+    --query Parameter.Value \
+    --output text > "/etc/strike-shop/$${name}.env"
+done
+
+chown root:root /etc/strike-shop/*.env
+chmod 600 /etc/strike-shop/*.env
+
+# --- Stack -------------------------------------------------------------------
+# pull -> migrate -> up -> wait for healthy. On a fresh instance the Postgres
+# volume is empty, so this is also where migrations and the seed run.
+bash /opt/strike-shop/deploy/deploy.sh
