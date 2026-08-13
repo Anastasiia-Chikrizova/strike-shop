@@ -150,6 +150,25 @@ services:
     restart: unless-stopped
     logging: *default-logging
 
+  # Public access goes through Cloudflare Tunnel, so nothing is exposed to the
+  # internet directly: the connector dials out, and the security group has no
+  # ingress rules at all. TLS terminates at the Cloudflare edge, which is why
+  # nginx below it only ever speaks plain HTTP.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?set TUNNEL_TOKEN}
+    depends_on:
+      - nginx
+    deploy:
+      resources:
+        limits:
+          cpus: '${CLOUDFLARED_CPUS:-0.25}'
+          memory: ${CLOUDFLARED_MEMORY:-64m}
+    restart: unless-stopped
+    logging: *default-logging
+
 volumes:
   pgdata:
   redisdata:
