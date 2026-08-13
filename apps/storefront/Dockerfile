@@ -47,6 +47,13 @@ COPY --from=builder /repo/apps/storefront/.next/standalone ./
 COPY --from=builder /repo/apps/storefront/.next/static ./apps/storefront/.next/static
 COPY --from=builder /repo/apps/storefront/public ./apps/storefront/public
 
+# The COPYs above run as root, so /app is read-only for the app user. The one
+# thing Next writes at runtime is its incremental cache (ISR, fetch results,
+# optimized images) — hand over that directory alone and leave the rest
+# immutable. Without it the server logs EACCES and re-renders every request.
+RUN mkdir -p apps/storefront/.next/cache \
+    && chown node:node apps/storefront/.next/cache
+
 USER node
 
 EXPOSE 8000
