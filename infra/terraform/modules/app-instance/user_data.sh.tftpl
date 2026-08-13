@@ -1,0 +1,40 @@
+#!/bin/bash
+set -euxo pipefail
+
+# --- Docker ----------------------------------------------------------------
+dnf install -y docker git
+systemctl enable --now docker
+usermod -aG docker ec2-user
+
+# Compose is not packaged for AL2023; it goes in as a CLI plugin binary.
+mkdir -p /usr/libexec/docker/cli-plugins
+curl -fsSL \
+  https://github.com/docker/compose/releases/latest/download/docker-compose-linux-aarch64 \
+  -o /usr/libexec/docker/cli-plugins/docker-compose
+chmod +x /usr/libexec/docker/cli-plugins/docker-compose
+
+# --- Swap ------------------------------------------------------------------
+# dd, not fallocate: the root filesystem is XFS, and swapon rejects files with
+# unwritten extents ("skipping - it appears to have holes").
+if [ ! -f /swapfile ]; then
+  dd if=/dev/zero of=/swapfile bs=1M count=$((${swap_size_gb} * 1024)) status=none
+  chmod 600 /swapfile
+  mkswap /swapfile
+  swapon /swapfile
+  echo '/swapfile none swap sw 0 0' >> /etc/fstab
+fi
+
+# Swap is an emergency buffer here, not a second tier of RAM: use it only when
+# actually short. Default is 60, which starts swapping far too eagerly.
+echo 'vm.swappiness=10' > /etc/sysctl.d/99-swappiness.conf
+sysctl -p /etc/sysctl.d/99-swappiness.conf
+
+# --- Application -----------------------------------------------------------
+git clone ${repo_url} /opt/strike-shop
+chown -R ec2-user:ec2-user /opt/strike-shop
+
+# Secrets live here, outside the repository, root-owned. They are placed by
+# hand over SSM on first setup — deliberately not by user_data, which is
+# readable from the instance through IMDS.
+mkdir -p /etc/strike-shop
+chmod 700 /etc/strike-shop

@@ -39,10 +39,13 @@ terraform.rc
 *.tfvars
 *.tfvars.json
 !*.tfvars.example
+# Saved plans hold resource values in cleartext.
+tfplan
+*.tfplan
 # .terraform.lock.hcl is deliberately NOT ignored in root modules — it pins
 # provider hashes, same role as package-lock.json. Reusable modules do not
 # consume a lock file, so theirs is just init noise.
-infra/modules/*/.terraform.lock.hcl
+infra/terraform/modules/*/.terraform.lock.hcl
 
 # Production
 **/build

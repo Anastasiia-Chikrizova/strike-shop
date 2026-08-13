@@ -3,14 +3,14 @@ name: build & push to GHCR
 on:
   pull_request:
   push:
-    branches: [dev, main]
+    branches: [eks, main]
   workflow_dispatch:
     inputs:
       environment:
         description: Target environment
         type: choice
-        options: [staging, prod]
-        default: staging
+        options: [eks, prod]
+        default: eks
 
 concurrency:
   group: build-${{ github.workflow }}-${{ github.ref }}
@@ -46,7 +46,7 @@ jobs:
 
       - id: vars
         run: |
-          echo "app_env=${{ inputs.environment || (github.ref_name == 'main' && 'prod') || 'staging' }}" >> "$GITHUB_OUTPUT"
+          echo "app_env=${{ inputs.environment || (github.ref_name == 'main' && 'prod') || 'eks' }}" >> "$GITHUB_OUTPUT"
           echo "img_prefix=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
 
   # Lint + typecheck, split per app and gated on the same path filter as the
