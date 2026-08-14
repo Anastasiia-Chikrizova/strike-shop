@@ -12,7 +12,7 @@ on:
 
 permissions:
   contents: read
-  packages: write
+  id-token: write
 
 jobs:
   lint:
@@ -42,11 +42,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: docker/login-action@v4
+      - uses: aws-actions/configure-aws-credentials@v4
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          role-to-assume: arn:aws:iam::814454905474:role/strike-shop-prod-github-deploy
+          aws-region: eu-north-1
+
+      - uses: aws-actions/amazon-ecr-login@v2
 
       - uses: docker/setup-buildx-action@v4
 
@@ -59,7 +60,7 @@ jobs:
           build-args: APP_ENV=${{ env.APP_ENV }}
           push: true
           tags: |
-            ${{ inputs.img_prefix }}/strike-backend:${{ github.sha }}
-            ${{ inputs.img_prefix }}/strike-backend:${{ env.APP_ENV }}
+            ${{ inputs.img_prefix }}/backend:${{ github.sha }}
+            ${{ inputs.img_prefix }}/backend:${{ env.APP_ENV }}
           cache-from: type=gha,scope=backend-${{ env.APP_ENV }}
           cache-to: type=gha,scope=backend-${{ env.APP_ENV }},mode=max
