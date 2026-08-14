@@ -49,9 +49,9 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
         ]
       },
       {
-        Sid    = "ReadCommandResult"
-        Effect = "Allow"
-        Action = ["ssm:GetCommandInvocation", "ssm:ListCommandInvocations"]
+        Sid      = "ReadCommandResult"
+        Effect   = "Allow"
+        Action   = ["ssm:GetCommandInvocation", "ssm:ListCommandInvocations"]
         Resource = "*"
       }
     ]
