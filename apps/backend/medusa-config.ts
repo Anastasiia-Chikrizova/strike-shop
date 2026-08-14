@@ -15,27 +15,30 @@ module.exports = defineConfig({
   projectConfig: {
     databaseUrl: process.env.DATABASE_URL,
     redisUrl: REDIS_URL,
+    databaseDriverOptions: {
+      pool: { min: 2, max: 10 },
+    },
     http: {
       storeCors: process.env.STORE_CORS!,
       adminCors: process.env.ADMIN_CORS!,
       authCors: process.env.AUTH_CORS!,
       jwtSecret: process.env.JWT_SECRET,
       cookieSecret: process.env.COOKIE_SECRET,
-    }
+    },
   },
   modules: [
     ...(REDIS_URL
       ? [
           {
-            resolve: '@medusajs/medusa/cache-redis',
+            resolve: "@medusajs/medusa/cache-redis",
             options: { redisUrl: REDIS_URL },
           },
           {
-            resolve: '@medusajs/medusa/event-bus-redis',
+            resolve: "@medusajs/medusa/event-bus-redis",
             options: { redisUrl: REDIS_URL },
           },
           {
-            resolve: '@medusajs/medusa/workflow-engine-redis',
+            resolve: "@medusajs/medusa/workflow-engine-redis",
             options: { redis: { url: REDIS_URL } },
           },
         ]
@@ -43,17 +46,17 @@ module.exports = defineConfig({
     ...(R2_ENABLED
       ? [
           {
-            resolve: '@medusajs/medusa/file',
+            resolve: "@medusajs/medusa/file",
             options: {
               providers: [
                 {
-                  resolve: '@medusajs/medusa/file-s3',
-                  id: 's3',
+                  resolve: "@medusajs/medusa/file-s3",
+                  id: "s3",
                   options: {
                     file_url: R2_PUBLIC_URL,
                     access_key_id: R2_ACCESS_KEY_ID,
                     secret_access_key: R2_SECRET_ACCESS_KEY,
-                    region: 'auto',
+                    region: "auto",
                     bucket: R2_BUCKET,
                     endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
                     additional_client_config: {
@@ -67,18 +70,18 @@ module.exports = defineConfig({
           },
         ]
       : []),
-    { resolve: './src/modules/monobank' },
+    { resolve: "./src/modules/monobank" },
     {
-      resolve: '@medusajs/medusa/payment',
+      resolve: "@medusajs/medusa/payment",
       options: {
         providers: [
           {
-            resolve: './src/modules/monobank-payment',
-            id: 'monobank',
+            resolve: "./src/modules/monobank-payment",
+            id: "monobank",
             options: {
               apiKey: process.env.MONO_KEY,
               apiUrl: process.env.MONO_API_URL,
-              paymentType: process.env.MONO_PAYMENT_TYPE ?? 'debit',
+              paymentType: process.env.MONO_PAYMENT_TYPE ?? "debit",
               redirectUrl: process.env.MONO_REDIRECT_URL,
               webhookUrl: process.env.MONO_WEBHOOK_URL,
             },
@@ -86,5 +89,5 @@ module.exports = defineConfig({
         ],
       },
     },
-  ]
-})
+  ],
+});
