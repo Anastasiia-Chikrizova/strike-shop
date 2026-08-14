@@ -95,7 +95,8 @@ jobs:
 
   deploy:
     needs: [setup, backend, storefront]
-    if: >
+    if: |
+      always() &&
       github.event_name != 'pull_request' &&
       needs.setup.outputs.app_env == 'prod' &&
       (needs.backend.result == 'success' || needs.backend.result == 'skipped') &&
@@ -110,15 +111,28 @@ jobs:
           role-to-assume: arn:aws:iam::814454905474:role/strike-shop-prod-github-deploy
           aws-region: eu-north-1
 
-      - name: Deploy via SSM
+      - name: Determine changed services
+        id: services
         run: |
+          SERVICES=""
+          [ "${{ needs.backend.result }}" = "success" ] && SERVICES="backend"
+          [ "${{ needs.storefront.result }}" = "success" ] && SERVICES="$SERVICES storefront"
+          SERVICES="$(echo "$SERVICES" | xargs)"
+          echo "services=$SERVICES" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy via SSM
+        if: steps.services.outputs.services != ''
+        run: |
+          CMD="cd /opt/strike-shop && sudo SERVICES='${{ steps.services.outputs.services }}' ./deploy/deploy.sh"
+          PARAMS=$(jq -n --arg cmd "$CMD" '{commands: [$cmd]}')
+
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids i-0e58c3b992bf7091f \
             --document-name AWS-RunShellScript \
-            --parameters 'commands=["cd /opt/strike-shop && sudo ./deploy/deploy.sh"]' \
+            --parameters "$PARAMS" \
             --query Command.CommandId --output text)
 
-          echo "SSM command: $COMMAND_ID"
+          echo "SSM command: $COMMAND_ID (services: ${{ steps.services.outputs.services }})"
 
           aws ssm wait command-executed \
             --command-id "$COMMAND_ID" --instance-id i-0e58c3b992bf7091f

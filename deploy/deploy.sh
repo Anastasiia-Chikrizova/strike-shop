@@ -2,12 +2,14 @@
 #
 # Staging rollout. Run on the server from /opt/strike-shop:
 #
-#   ./deploy/deploy.sh              # tag from stack.env (staging)
-#   TAG=9f2c1ab ./deploy/deploy.sh  # a specific build, or a rollback
+#   ./deploy/deploy.sh                    # tag from stack.env (staging)
+#   TAG=9f2c1ab ./deploy/deploy.sh        # a specific build, or a rollback
+#   SERVICES=storefront ./deploy/deploy.sh  # only this app — skips migrate too
 #
 set -euo pipefail
 
 STACK_ENV="${STACK_ENV:-/etc/strike-shop/stack.env}"
+SERVICES="${SERVICES:-backend storefront}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 COMPOSE_FILE="$ROOT/docker-compose.deploy.yml"
 
@@ -32,24 +34,32 @@ fi
 compose() { docker compose --env-file "$STACK_ENV" -f "$COMPOSE_FILE" "$@"; }
 
 step "Images"
-echo "  backend:    $BACKEND_IMAGE"
-echo "  storefront: $STOREFRONT_IMAGE"
+for service in $SERVICES; do
+  case "$service" in
+    backend)    echo "  backend:    $BACKEND_IMAGE" ;;
+    storefront) echo "  storefront: $STOREFRONT_IMAGE" ;;
+  esac
+done
 
 step "Pulling images from GHCR"
-compose pull
+compose pull $SERVICES
 
 step "Starting database and cache"
 compose up -d postgres redis
 
 step "Migrations"
-# Behind the tools profile, so the service does not come up with the rest.
-compose --profile tools run --rm migrate
+if [[ " $SERVICES " == *" backend "* ]]; then
+  # Behind the tools profile, so the service does not come up with the rest.
+  compose --profile tools run --rm migrate
+else
+  echo "  skipped — backend not in \$SERVICES ($SERVICES)"
+fi
 
 step "Starting applications"
-compose up -d --remove-orphans
+compose up -d --remove-orphans $SERVICES
 
 step "Waiting for healthy"
-for service in backend storefront; do
+for service in $SERVICES; do
   cid="$(compose ps -q "$service")"
   [[ -n "$cid" ]] || die "$service did not start"
   for _ in $(seq 1 60); do
