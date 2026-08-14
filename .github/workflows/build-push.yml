@@ -19,6 +19,7 @@ concurrency:
 permissions:
   contents: read
   packages: write
+  id-token: write
 
 jobs:
   setup:
@@ -49,148 +50,26 @@ jobs:
           echo "app_env=${{ inputs.environment || (github.ref_name == 'main' && 'prod') || 'eks' }}" >> "$GITHUB_OUTPUT"
           echo "img_prefix=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
 
-  # Lint + typecheck, split per app and gated on the same path filter as the
-  # build jobs below — a PR touching only the storefront doesn't wait on the
-  # backend's checks and vice versa. Runs on every PR; the build jobs further
-  # down only run on push/workflow_dispatch, so this is the only check PRs get.
-  #
-  # The storefront build itself cannot be trusted to catch anything:
-  # apps/storefront/next.config.js sets `eslint.ignoreDuringBuilds` and
-  # `typescript.ignoreBuildErrors`, deliberately, to keep `next build` fast.
-  # This is the only place type errors and lint errors surface for it.
-  lint-backend:
+  backend:
     needs: setup
     if: needs.setup.outputs.backend_changed == 'true' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci --no-audit --no-fund
-      - name: Lint
-        run: npx turbo lint --filter=@dtc/backend
-      - name: Typecheck
-        run: npx turbo typecheck --filter=@dtc/backend
-
-  lint-storefront:
-    needs: setup
-    if: needs.setup.outputs.storefront_changed == 'true' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci --no-audit --no-fund
-      - name: Lint
-        run: npx turbo lint --filter=@dtc/storefront
-      # The storefront tsconfig includes .next/types, which holds the
-      # generated typed-route definitions. `next typegen` writes them without
-      # a full build; without it tsc reports phantom errors on typed
-      # <Link href>. The publishable key is a placeholder purely to satisfy
-      # check-env-variables.js — typegen never calls the backend.
-      - name: Typecheck
-        env:
-          NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY: pk_ci_placeholder
-        run: npx turbo typecheck --filter=@dtc/storefront
-
-  backend:
-    needs: [setup, lint-backend]
-    if: github.event_name != 'pull_request' && (github.event_name == 'workflow_dispatch' || needs.setup.outputs.backend_changed == 'true')
-    # arm64 runner, so the arm64 image is built natively. Cross-building it on
-    # an amd64 runner would fall back to QEMU and take an order of magnitude
-    # longer. These runners are free for public repositories.
-    runs-on: ubuntu-24.04-arm
-    environment: ${{ needs.setup.outputs.app_env }}
-
-    env:
-      APP_ENV: ${{ needs.setup.outputs.app_env }}
-      # arm64 targets AWS Graviton (t4g/c7g), roughly 20% cheaper than the
-      # equivalent x86 instance at better price/performance. Node runs on it
-      # natively. Switching back to amd64 means changing this and `runs-on`
-      # together — a mismatch silently costs ~10x build time.
-      PLATFORM: linux/arm64
-
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: docker/setup-buildx-action@v4
-
-      - name: Backend
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: apps/backend/Dockerfile
-          platforms: ${{ env.PLATFORM }}
-          build-args: APP_ENV=${{ env.APP_ENV }}
-          push: true
-          tags: |
-            ${{ needs.setup.outputs.img_prefix }}/strike-backend:${{ github.sha }}
-            ${{ needs.setup.outputs.img_prefix }}/strike-backend:${{ env.APP_ENV }}
-          cache-from: type=gha,scope=backend-${{ env.APP_ENV }}
-          cache-to: type=gha,scope=backend-${{ env.APP_ENV }},mode=max
+    uses: ./.github/workflows/build-backend.yml
+    with:
+      app_env: ${{ needs.setup.outputs.app_env }}
+      img_prefix: ${{ needs.setup.outputs.img_prefix }}
 
   storefront:
-    needs: [setup, lint-storefront]
-    if: github.event_name != 'pull_request' && (github.event_name == 'workflow_dispatch' || needs.setup.outputs.storefront_changed == 'true')
-    # Native arm64, same reasoning as the backend job above.
-    runs-on: ubuntu-24.04-arm
-    environment: ${{ needs.setup.outputs.app_env }}
-
-    env:
-      APP_ENV: ${{ needs.setup.outputs.app_env }}
-      PLATFORM: linux/arm64
-
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: docker/setup-buildx-action@v4
-      - name: Write storefront env to file
-        id: env_file
-        run: |
-          printf '%s' "${{ secrets.STOREFRONT_ENV }}" > /tmp/storefront.env
-          test -s /tmp/storefront.env
-          echo "hash=$(sha256sum /tmp/storefront.env | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
-
-      - name: Storefront
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: apps/storefront/Dockerfile
-          platforms: ${{ env.PLATFORM }}
-          build-args: |
-            APP_ENV=${{ env.APP_ENV }}
-            STOREFRONT_ENV_HASH=${{ steps.env_file.outputs.hash }}
-          secret-files: |
-            app_env=/tmp/storefront.env
-          push: true
-          tags: |
-            ${{ needs.setup.outputs.img_prefix }}/strike-storefront:${{ github.sha }}
-            ${{ needs.setup.outputs.img_prefix }}/strike-storefront:${{ env.APP_ENV }}
-          cache-from: type=gha,scope=storefront-${{ env.APP_ENV }}
-          cache-to: type=gha,scope=storefront-${{ env.APP_ENV }},mode=max
-
-      - name: Clean up env file
-        if: always()
-        run: rm -f /tmp/storefront.env
+    needs: setup
+    if: needs.setup.outputs.storefront_changed == 'true' || github.event_name == 'workflow_dispatch'
+    uses: ./.github/workflows/build-storefront.yml
+    with:
+      app_env: ${{ needs.setup.outputs.app_env }}
+      img_prefix: ${{ needs.setup.outputs.img_prefix }}
+    secrets:
+      STOREFRONT_ENV: ${{ secrets.STOREFRONT_ENV }}
 
   summary:
-    needs: [setup, lint-backend, lint-storefront, backend, storefront]
+    needs: [setup, backend, storefront]
     if: always() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-24.04
     steps:
@@ -200,16 +79,11 @@ jobs:
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           if [ "${{ needs.backend.result }}" = "success" ]; then
             echo "${{ needs.setup.outputs.img_prefix }}/strike-backend:${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
-          elif [ "${{ needs['lint-backend'].result }}" = "failure" ]; then
-            echo "backend: skipped, lint/typecheck gate failed" >> "$GITHUB_STEP_SUMMARY"
-          else
+          elif [ "${{ needs.backend.result }}" = "skipped" ]; then
             echo "backend: skipped, no changes under apps/backend" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "backend: failed (lint/typecheck or build)" >> "$GITHUB_STEP_SUMMARY"
           fi
           if [ "${{ needs.storefront.result }}" = "success" ]; then
             echo "${{ needs.setup.outputs.img_prefix }}/strike-storefront:${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
-          elif [ "${{ needs['lint-storefront'].result }}" = "failure" ]; then
-            echo "storefront: skipped, lint/typecheck gate failed" >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "storefront: skipped, no changes under apps/storefront" >> "$GITHUB_STEP_SUMMARY"
-          fi
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          elif [ "${{ needs.storefront.resu

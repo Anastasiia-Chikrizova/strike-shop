@@ -273,64 +273,7 @@ Verify after rollout by checking that the `monobank_webhook_log` table is
 filling up (it also records webhooks that failed signature verification).
 Integration details: [apps/backend/src/lib/monobank/README.md](../apps/backend/src/lib/monobank/README.md).
 
-## 9. Known issue: migrations inside the container
-
-`npx medusa db:migrate` inside the container fails after exactly 10 seconds
-with a message that blames the database:
-
-```
-Could not connect to the database while running migrations.
-The connection timed out after 10 seconds, which usually indicates an
-incorrect database URL or an SSL configuration issue.
-```
-
-**The message is wrong on both counts.** It comes from
-`verifyMigrationConnection()` in `@medusajs/modules-sdk`, a pre-flight
-`knex.raw("SELECT 1")` wrapped in a `Promise.race` against a fixed timeout.
-Everything it names as a likely cause has been ruled out.
-
-Previously reproduced on Docker Desktop (macOS/arm64) and assumed to be a
-Docker Desktop artifact. **It is not** — it reproduced six times in a row on
-the real instance (AL2023, arm64, native Docker), on an empty database.
-
-| Suspect | Ruled out because |
-| --- | --- |
-| Unreachable DB | `psql` and `redis-cli` from the compose network answer instantly |
-| Wrong URL | raw `pg` from the same image, same network, same `DATABASE_URL` — connects |
-| Pool config | bare `knex`, and Medusa's own `createPgConnection`, run `SELECT 1` fine; also fine under 12 concurrent queries |
-| SSL | Postgres refuses SSL *immediately* (`server does not support SSL`) — that is an error, not a hang |
-| Redis | fails identically with `REDIS_URL=` (fake redis) |
-| Resource limits | fails outside compose with no cgroup limits, 1.1 GB free, swap untouched, both cores idle |
-| Baked-in `.env` | there is none in the image; `loadEnv()` does not change `DATABASE_URL` |
-
-The real error only appears once the timeout is raised past knex's own
-acquire timeout:
-
-```bash
-docker run ... -e MEDUSA_DB_MIGRATION_CONNECTION_TIMEOUT=90000 ... npx medusa db:migrate
-# Knex: Timeout acquiring a connection. The pool is probably full.
-```
-
-With `DEBUG=knex:*` you can see the first connection working normally — it
-runs `SELECT 1`, the `pgstream` schema probe and the `mikro_orm_migrations`
-existence check — and then a second connection, the one the module migrations
-use, never appearing in the log at all. It is created, silently fails to
-connect, and tarn retries until the race times out.
-
-**How it was unstuck:** mounting a `medusa-config.js` with explicit
-`databaseDriverOptions: { connection: { ssl: false }, pool: { min: 2, max: 10 } }`
-made the migrations run through, all 145 tables and the seed. But a control
-run on a *freshly created* database with the **stock** config also succeeded,
-so this is not a proven fix and the root cause is still open. The likeliest
-remaining explanation is a bad half-state: the very first attempt creates
-`mikro_orm_migrations` and dies, and subsequent runs stumble over it.
-
-If it happens again, in order: raise
-`MEDUSA_DB_MIGRATION_CONNECTION_TIMEOUT` and read the real error, turn on
-`DEBUG=knex:*`, and only then start changing config. Do not trust the text of
-the default message.
-
-## 10. Deliberately out of scope here
+## 9. Deliberately out of scope here
 
 - **backups** — the catalogue is seeded and reproducible, so losing the
   database costs one `seed` run. The moment there is data worth keeping: a
