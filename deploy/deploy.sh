@@ -41,7 +41,11 @@ for service in $SERVICES; do
   esac
 done
 
-step "Pulling images from GHCR"
+step "Logging into ECR"
+aws ecr get-login-password --region eu-north-1 \
+  | docker login --username AWS --password-stdin "${BACKEND_IMAGE%%/*}"
+
+step "Pulling images from ECR"
 compose pull $SERVICES
 
 step "Starting database and cache"

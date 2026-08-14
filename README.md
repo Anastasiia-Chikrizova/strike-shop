@@ -66,7 +66,7 @@ Docker Compose behind a Cloudflare Tunnel. Nothing is exposed to the internet
 directly: the security group has no inbound rules at all, and shell access
 goes through AWS Session Manager rather than SSH.
 
-Images are built for `linux/arm64` by GitHub Actions and pushed to GHCR.
+Images are built for `linux/arm64` by GitHub Actions and pushed to ECR.
 Server setup, secrets and the rollout procedure are in
 [deploy/README.md](deploy/README.md).
 
@@ -94,7 +94,7 @@ flowchart TB
         ssm["SSM Parameter Store<br/><i>SecureString env files</i>"]
     end
 
-    ghcr["GHCR<br/>arm64 images"]
+    ecr["ECR<br/>arm64 images"]
     gha["GitHub Actions"]
     admin([Operator])
 
@@ -106,7 +106,7 @@ flowchart TB
     back --> redis
     pg -.->|"bind mount"| ebs
     ssm -.->|"read at boot by instance role"| compose
-    gha --> ghcr -.->|"docker pull"| compose
+    gha --> ecr -.->|"docker pull"| compose
     admin -->|"Session Manager, no SSH"| AWS
 ```
 
@@ -136,7 +136,7 @@ Measured from Cost Explorer and the Price List API on 2026-08-14, region
 | EBS gp3, 30 GB root | $0.0836/GB-mo | 2.51 |
 | EBS gp3, 10 GB Postgres data | $0.0836/GB-mo | 0.84 |
 | Public IPv4 address | $0.005/h | 3.65 |
-| S3 state bucket, Parameter Store, KMS, CloudWatch | within always-free tiers | ~0.00 |
+| S3 state bucket, Parameter Store, KMS, CloudWatch, ECR | within always-free tiers | ~0.00 |
 | **Total** | | **6.99** |
 
 Compute is the largest line item and it currently bills at zero: the t4g free
@@ -150,9 +150,12 @@ Note what this makes the public IPv4 address: at $3.65/month it is the single
 most expensive thing here, more than both EBS volumes together. It exists only
 because the instance sits in a public subnet and needs outbound access.
 
-Zero-cost by choice, not by luck: Cloudflare Tunnel and Access (free tier),
-GHCR, and GitHub Actions on a public repository. There is no load balancer, no
-NAT gateway and no managed database — see below.
+Zero-cost by choice, not by luck: Cloudflare Tunnel and Access (free tier) and
+GitHub Actions on a public repository. There is no load balancer, no NAT
+gateway and no managed database — see below. ECR's private-repo free tier
+(500 MB-month, 12 months from account creation) covers the two images today;
+the lifecycle policy caps growth at 10 tagged versions each, so this is worth
+re-checking once the free tier runs out.
 
 Actually billed so far: **$0.00.** The account carries a $200 Free Tier credit
 balance, and usage is drawn against it — $0.20 consumed at the time of writing.
