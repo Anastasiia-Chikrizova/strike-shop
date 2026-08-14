@@ -15,7 +15,7 @@ AVD-AWS-0132
 
 # AWS-0104 — security group allows egress to 0.0.0.0/0.
 # The SSM agent and cloudflared both dial *out*, to rotating AWS and Cloudflare
-# endpoints; image pulls go to GHCR. Restricting this properly means VPC
+# endpoints; image pulls go to ECR. Restricting this properly means VPC
 # endpoints (interface endpoints are ~$7/month each, more than the instance).
 # Note the other half of the trade: there is not a single ingress rule, so
 # nothing can reach in.
@@ -23,7 +23,17 @@ AVD-AWS-0104
 
 # AWS-0164 — subnet assigns public IPs on launch.
 # There is no NAT gateway (~$33/month, five times the entire app budget), so a
-# public IP is the only way out for an instance that must reach SSM, GHCR and
+# public IP is the only way out for an instance that must reach SSM, ECR and
 # Cloudflare. The IPv4 itself costs $3.65/month. Nothing listens on it: no
 # ingress rules, no open ports, no SSH.
 AVD-AWS-0164
+
+# AWS-0031 — ECR repository tags are mutable.
+# Deliberate, not an oversight: deploy.sh and the deploy workflow rely on a
+# floating tag (`:prod`/`:eks`) that gets reassigned to the newest image on
+# every push — that's how the server knows what to pull without the pipeline
+# telling it a digest. IMMUTABLE would make that specific re-tag fail outright.
+# The immutable, addressable reference already exists alongside it: every push
+# also tags the image with `:${{ github.sha }}`, which never gets reused —
+# that's what deploy.sh's `TAG=<sha>` rollback path pins to.
+AVD-AWS-0031
