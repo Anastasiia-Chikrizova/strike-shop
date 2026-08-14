@@ -19,6 +19,7 @@ export default async function ProductPreview({
     product,
   })
 
+
   return (
     <LocalizedClientLink href={`/products/${product.handle}`} className="group">
       <div data-testid="product-wrapper">
@@ -28,7 +29,7 @@ export default async function ProductPreview({
           size="full"
           isFeatured={isFeatured}
         />
-        <div className="flex txt-compact-medium mt-4 justify-between">
+        <div className="flex txt-compact-medium mt-4 justify-between flex-col">
           <Text className="text-ui-fg-subtle" data-testid="product-title">
             {product.title}
           </Text>
