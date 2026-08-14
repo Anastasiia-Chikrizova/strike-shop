@@ -25,7 +25,11 @@ resource "aws_iam_role" "github_actions_deploy" {
           "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
         }
         StringLike = {
-          "token.actions.githubusercontent.com:sub" = "repo:Anastasiia-Chikrizova/strike-shop:ref:refs/heads/main"
+          "token.actions.githubusercontent.com:sub" = [
+            "repo:Anastasiia-Chikrizova@78729920/strike-shop@1311393187:ref:refs/heads/main",
+            "repo:Anastasiia-Chikrizova@78729920/strike-shop@1311393187:environment:prod",
+            "repo:Anastasiia-Chikrizova@78729920/strike-shop@1311393187:environment:eks",
+          ]
         }
       }
     }]

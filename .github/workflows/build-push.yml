@@ -77,14 +77,14 @@ jobs:
           echo "### ${{ needs.setup.outputs.app_env }} → ${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           if [ "${{ needs.backend.result }}" = "success" ]; then
-            echo "${{ needs.setup.outputs.img_prefix }}/strike-backend:${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
+            echo "${{ needs.setup.outputs.img_prefix }}/backend:${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
           elif [ "${{ needs.backend.result }}" = "skipped" ]; then
             echo "backend: skipped, no changes under apps/backend" >> "$GITHUB_STEP_SUMMARY"
           else
             echo "backend: failed (lint/typecheck or build)" >> "$GITHUB_STEP_SUMMARY"
           fi
           if [ "${{ needs.storefront.result }}" = "success" ]; then
-            echo "${{ needs.setup.outputs.img_prefix }}/strike-storefront:${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
+            echo "${{ needs.setup.outputs.img_prefix }}/storefront:${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
           elif [ "${{ needs.storefront.result }}" = "skipped" ]; then
             echo "storefront: skipped, no changes under apps/storefront" >> "$GITHUB_STEP_SUMMARY"
           else
@@ -105,16 +105,7 @@ jobs:
       id-token: write
       contents: read
     steps:
-      # Temporary: prints the real sub/aud claims GitHub sends, to nail down
-      # why AssumeRoleWithWebIdentity is rejected. Remove once the trust
-      # policy condition is confirmed correct.
-      - name: Debug OIDC token claims
-        run: |
-          curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" \
-            | jq -r '.value' | cut -d. -f2 | base64 -d 2>/dev/null | jq .
-
-      - uses: aws-actions/configure-aws-credentials@v4
+      - uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: arn:aws:iam::814454905474:role/strike-shop-prod-github-deploy
           aws-region: eu-north-1

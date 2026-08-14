@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:22-alpine AS deps
+FROM node:24-alpine AS deps
 WORKDIR /repo
 
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -11,7 +11,7 @@ COPY apps/storefront/package.json apps/storefront/
 RUN --mount=type=cache,target=/root/.npm \
     npm ci --workspace=@dtc/storefront --include-workspace-root --no-audit --no-fund
 
-FROM node:22-alpine AS builder
+FROM node:24-alpine AS builder
 WORKDIR /repo
 
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -32,7 +32,7 @@ RUN --mount=type=secret,id=app_env,target=/run/secrets/app_env \
     fi; \
     npm run build --workspace=@dtc/storefront
 
-FROM node:22-alpine AS runner
+FROM node:24-alpine AS runner
 WORKDIR /app
 
 ARG APP_ENV=production
