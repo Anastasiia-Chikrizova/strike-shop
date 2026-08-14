@@ -75,6 +75,20 @@ chown root:root /etc/strike-shop/*.env
 chmod 600 /etc/strike-shop/*.env
 
 # --- Stack -------------------------------------------------------------------
-# pull -> migrate -> up -> wait for healthy. On a fresh instance the Postgres
-# volume is empty, so this is also where migrations and the seed run.
-bash /opt/strike-shop/deploy/deploy.sh
+# pull -> migrate -> up -> wait for healthy. On a first boot against an empty
+# data volume this is also where the migrations and the seed run.
+#
+# The fallback is not laziness. deploy.sh runs with `set -e`, and Medusa's
+# db:migrate intermittently dies on a "connection timed out" that has nothing
+# to do with the database (see deploy/README.md §9). When the volume already
+# carries a migrated database — the normal case when an instance is replaced —
+# that failure must not leave the box half-started. The error stays in
+# /var/log/cloud-init-output.log, and if the schema really is stale the backend
+# will fail its healthcheck, which is visible in `compose ps`.
+bash /opt/strike-shop/deploy/deploy.sh || {
+  echo "deploy.sh failed — starting the stack without it"
+  docker compose \
+    --env-file /etc/strike-shop/stack.env \
+    -f /opt/strike-shop/docker-compose.deploy.yml \
+    up -d
+}

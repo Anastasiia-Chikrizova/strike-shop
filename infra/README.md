@@ -69,9 +69,20 @@ need to know which.
 | | `environments/prod` | `environments/eks` |
 |---|---|---|
 | Lifetime | months | hours |
-| Compute | t4g.small — **$0**, free trial to 2026-12-31 | EKS control plane $0.10/h + 2×t4g.medium $0.069/h |
-| Cost | ~$6.29/month | ~$0.18/hour |
-| 4 months if left running | $25 | **$525** ← never do this |
+| Compute | t4g.small — **$0**, free trial, 750 h/month | EKS control plane $0.10/h + 2×t4g.medium $0.0688/h |
+| Cost | **$6.99/month** ($0.23/day) | $0.169/hour |
+| 4 months if left running | $28 | **$493** ← never do this |
+
+Checked on 2026-08-14 against Cost Explorer at usage-type granularity. The
+compute line is genuinely zero — `EUN1-BoxUsage:t4g.small` records real
+instance hours at $0.00 — so the monthly cost is the public IPv4 address
+($3.65) plus 40 GB of gp3 ($3.34). The trial covers `t4g.small` **only**; any
+other size, `t4g.medium` included, is billed in full, which turns $6.99/month
+into $32.10. When the trial ends, this row becomes $19.55/month.
+
+The `eks` column is on-demand list price for compute alone. It excludes the NAT
+gateway and load balancer a real cluster usually drags in, so treat $493 as a
+floor rather than an estimate.
 
 The `eks` numbers are why it is a separate root module: one combined state
 would make it impossible to tear down the expensive half on its own.
