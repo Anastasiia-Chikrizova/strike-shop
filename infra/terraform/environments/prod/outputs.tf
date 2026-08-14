@@ -17,3 +17,8 @@ output "github_actions_role_arn" {
   description = "ARN of the role that GitHub Actions assumes via OIDC for deployment."
   value       = aws_iam_role.github_actions_deploy.arn
 }
+
+output "ecr_repository_urls" {
+  description = "ECR repository URLs, keyed by app name."
+  value       = { for k, r in aws_ecr_repository.this : k => r.repository_url }
+}

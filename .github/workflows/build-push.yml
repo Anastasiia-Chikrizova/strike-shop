@@ -1,4 +1,4 @@
-name: build & push to GHCR
+name: build & push to ECR
 
 on:
   pull_request:
@@ -18,7 +18,6 @@ concurrency:
 
 permissions:
   contents: read
-  packages: write
   id-token: write
 
 jobs:
@@ -48,7 +47,7 @@ jobs:
       - id: vars
         run: |
           echo "app_env=${{ inputs.environment || (github.ref_name == 'main' && 'prod') || 'eks' }}" >> "$GITHUB_OUTPUT"
-          echo "img_prefix=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+          echo "img_prefix=814454905474.dkr.ecr.eu-north-1.amazonaws.com/strike-shop" >> "$GITHUB_OUTPUT"
 
   backend:
     needs: setup
@@ -106,6 +105,15 @@ jobs:
       id-token: write
       contents: read
     steps:
+      # Temporary: prints the real sub/aud claims GitHub sends, to nail down
+      # why AssumeRoleWithWebIdentity is rejected. Remove once the trust
+      # policy condition is confirmed correct.
+      - name: Debug OIDC token claims
+        run: |
+          curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" \
+            | jq -r '.value' | cut -d. -f2 | base64 -d 2>/dev/null | jq .
+
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::814454905474:role/strike-shop-prod-github-deploy
