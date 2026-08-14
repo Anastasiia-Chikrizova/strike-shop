@@ -7,7 +7,7 @@ Live at [strike-shop.win](https://strike-shop.win); the API and admin at
 
 | File | What it is |
 | --- | --- |
-| [`.github/workflows/build-push.yml`](../.github/workflows/build-push.yml) | lint + typecheck on PRs (per app, path-filtered); builds both images for `linux/arm64` → GHCR on push/dispatch |
+| [`.github/workflows/build-push.yml`](../.github/workflows/build-push.yml) | lint + typecheck on PRs (per app, path-filtered); builds both images for `linux/arm64` → ECR on push/dispatch |
 | [`docker-compose.deploy.yml`](../docker-compose.deploy.yml) | deploy stack: only `image:`, no `build:` |
 | [`nginx/nginx.conf.template`](nginx/nginx.conf.template) | reverse proxy on plain HTTP, split by `server_name` — TLS terminates at the Cloudflare edge |
 | [`deploy.sh`](deploy.sh) | pull → migrate → up → wait for healthy |
@@ -72,12 +72,11 @@ Generating secrets: `openssl rand -base64 32` for `JWT_SECRET`,
 **`openssl rand -hex 24`**, not base64: the same value goes inside
 `DATABASE_URL`, and `+`, `/` and `=` have meaning in a URL.
 
-Both packages are public, so no `docker login` is needed to pull. If they are
-ever made private, a PAT with only the `read:packages` scope:
-
-```bash
-echo "<PAT>" | docker login ghcr.io -u Anastasiia-Chikrizova --password-stdin
-```
+ECR is always private, unlike the public GHCR packages this replaced — no PAT
+or manual `docker login` to set up, though. `deploy.sh` logs in itself before
+every pull, via `aws ecr get-login-password`, using the instance's own IAM
+role (`ecr:GetAuthorizationToken` + pull rights, scoped to the two repos —
+see `infra/terraform/environments/prod/ecr.tf`).
 
 On AWS, getting the files onto the box without SSH: `scp` tunnelled through
 Session Manager, with a throwaway key that lives for 60 seconds.
@@ -112,9 +111,11 @@ job before the build even starts, at `test -s /tmp/storefront.env` — which is
 deliberate, since a bundle built without `NEXT_PUBLIC_*` is worthless, but the
 log makes it look like a Docker problem rather than a missing secret.
 
-Each image job `needs` its own `lint-backend`/`lint-storefront` job (lint +
-typecheck, path-filtered — a PR touching only the storefront doesn't wait on
-the backend's checks), so a red gate pushes nothing to GHCR. It matters here
+Each app is its own reusable workflow ([`build-backend.yml`](../.github/workflows/build-backend.yml),
+[`build-storefront.yml`](../.github/workflows/build-storefront.yml)) with lint
++ typecheck gating the build inside it, called only when that app's paths
+changed — a PR touching only the storefront doesn't wait on the backend's
+checks, and a red gate pushes nothing to ECR. It matters here
 more than usual: `apps/storefront/next.config.js` sets
 `typescript.ignoreBuildErrors` and `eslint.ignoreDuringBuilds`, so the image
 build itself would happily ship code that does not typecheck.
@@ -135,6 +136,9 @@ once. So the backend goes up first, and only then is the storefront built.
 cd /opt/strike-shop
 set -a; . /etc/strike-shop/stack.env; set +a
 compose() { docker compose --env-file /etc/strike-shop/stack.env -f docker-compose.deploy.yml "$@"; }
+
+aws ecr get-login-password --region eu-north-1 \
+  | docker login --username AWS --password-stdin "${BACKEND_IMAGE%%/*}"
 
 compose pull backend
 compose up -d postgres redis
