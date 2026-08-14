@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:22-alpine AS deps
+FROM node:24-alpine AS deps
 WORKDIR /repo
 
 COPY package.json package-lock.json ./
@@ -9,7 +9,7 @@ COPY apps/backend/package.json apps/backend/
 RUN --mount=type=cache,target=/root/.npm \
     npm ci --workspace=@dtc/backend --include-workspace-root --no-audit --no-fund
 
-FROM node:22-alpine AS builder
+FROM node:24-alpine AS builder
 WORKDIR /repo
 
 COPY package.json package-lock.json ./
@@ -18,7 +18,7 @@ COPY --from=deps /repo/node_modules ./node_modules
 
 RUN npm run build --workspace=@dtc/backend
 
-FROM node:22-alpine AS server-deps
+FROM node:24-alpine AS server-deps
 WORKDIR /app
 
 COPY --from=deps /repo/node_modules ./node_modules
@@ -26,7 +26,7 @@ COPY --from=builder /repo/apps/backend/.medusa/server ./
 
 RUN npm prune --omit=dev --no-audit --no-fund
 
-FROM node:22-alpine AS runner
+FROM node:24-alpine AS runner
 WORKDIR /app
 
 ARG APP_ENV=production
