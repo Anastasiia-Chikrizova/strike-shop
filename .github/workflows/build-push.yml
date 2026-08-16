@@ -122,7 +122,7 @@ jobs:
       - name: Deploy via SSM
         if: steps.services.outputs.services != ''
         run: |
-          CMD="cd /opt/strike-shop && sudo SERVICES='${{ steps.services.outputs.services }}' ./deploy/deploy.sh"
+          CMD="cd /opt/strike-shop && sudo -u ec2-user git fetch --depth=1 origin ${{ github.sha }} && sudo -u ec2-user git checkout ${{ github.sha }} && sudo SERVICES='${{ steps.services.outputs.services }}' ./deploy/deploy.sh"
           PARAMS=$(jq -n --arg cmd "$CMD" '{commands: [$cmd]}')
 
           COMMAND_ID=$(aws ssm send-command \

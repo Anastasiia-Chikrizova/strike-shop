@@ -17,5 +17,5 @@ variable "project" {
 variable "environment" {
   description = "Environment name, used for tagging and resource naming."
   type        = string
-  default     = "demo"
+  default     = "eks"
 }

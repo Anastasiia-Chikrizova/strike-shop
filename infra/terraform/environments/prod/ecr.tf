@@ -45,7 +45,7 @@ resource "aws_ecr_lifecycle_policy" "this" {
 
 resource "aws_iam_role_policy" "github_actions_ecr_push" {
   name = "ecr-push"
-  role = aws_iam_role.github_actions_deploy.id
+  role = aws_iam_role.github_actions_build.id
 
   policy = jsonencode({
     Version = "2012-10-17"

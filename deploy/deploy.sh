@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
-# Staging rollout. Run on the server from /opt/strike-shop:
+# Production rollout. Run on the server from /opt/strike-shop:
 #
-#   ./deploy/deploy.sh                    # tag from stack.env (staging)
+#   ./deploy/deploy.sh                    # tag from stack.env (prod)
 #   TAG=9f2c1ab ./deploy/deploy.sh        # a specific build, or a rollback
 #   SERVICES=storefront ./deploy/deploy.sh  # only this app — skips migrate too
 #
@@ -40,10 +40,6 @@ for service in $SERVICES; do
     storefront) echo "  storefront: $STOREFRONT_IMAGE" ;;
   esac
 done
-
-step "Logging into ECR"
-aws ecr get-login-password --region eu-north-1 \
-  | docker login --username AWS --password-stdin "${BACKEND_IMAGE%%/*}"
 
 step "Pulling images from ECR"
 compose pull $SERVICES

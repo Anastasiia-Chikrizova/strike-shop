@@ -44,7 +44,7 @@ jobs:
 
       - uses: aws-actions/configure-aws-credentials@v6
         with:
-          role-to-assume: arn:aws:iam::814454905474:role/strike-shop-prod-github-deploy
+          role-to-assume: arn:aws:iam::814454905474:role/strike-shop-prod-github-build
           aws-region: eu-north-1
 
       - uses: aws-actions/amazon-ecr-login@v2

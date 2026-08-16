@@ -14,8 +14,13 @@ output "ssm_command" {
 }
 
 output "github_actions_role_arn" {
-  description = "ARN of the role that GitHub Actions assumes via OIDC for deployment."
+  description = "ARN of the role that GitHub Actions assumes via OIDC for deployment (SSM only)."
   value       = aws_iam_role.github_actions_deploy.arn
+}
+
+output "github_actions_build_role_arn" {
+  description = "ARN of the role that GitHub Actions assumes via OIDC for image builds (ECR push only)."
+  value       = aws_iam_role.github_actions_build.arn
 }
 
 output "ecr_repository_urls" {
