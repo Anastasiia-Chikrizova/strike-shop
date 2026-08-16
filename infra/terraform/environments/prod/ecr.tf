@@ -73,3 +73,30 @@ resource "aws_iam_role_policy" "github_actions_ecr_push" {
     ]
   })
 }
+
+resource "aws_iam_role_policy" "instance_ecr_pull" {
+  name = "ecr-pull"
+  role = module.app_instance.instance_role_name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid      = "GetAuthToken"
+        Effect   = "Allow"
+        Action   = "ecr:GetAuthorizationToken"
+        Resource = "*"
+      },
+      {
+        Sid    = "Pull"
+        Effect = "Allow"
+        Action = [
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:BatchGetImage",
+        ]
+        Resource = [for repo in aws_ecr_repository.this : repo.arn]
+      }
+    ]
+  })
+}
