@@ -26,9 +26,11 @@ module "network" {
 }
 
 output "vpc_id" {
-  value = module.network.vpc_id
+  description = "ID of the VPC."
+  value       = module.network.vpc_id
 }
 
 output "subnet_id" {
-  value = module.network.subnet_id
+  description = "ID of the public subnet."
+  value       = module.network.subnet_id
 }

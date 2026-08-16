@@ -33,9 +33,11 @@ module "app_instance" {
 }
 
 output "instance_id" {
-  value = module.app_instance.instance_id
+  description = "ID of the app instance."
+  value       = module.app_instance.instance_id
 }
 
 output "public_ip" {
-  value = module.app_instance.public_ip
+  description = "Public IPv4 of the app instance."
+  value       = module.app_instance.public_ip
 }
