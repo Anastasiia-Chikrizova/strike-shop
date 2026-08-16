@@ -33,11 +33,35 @@ fi
 
 compose() { docker compose --env-file "$STACK_ENV" -f "$COMPOSE_FILE" "$@"; }
 
+declare -A PREV_IMAGE=()
+rollback() {
+  local any=0
+  for service in $SERVICES; do
+    [[ -n "${PREV_IMAGE[$service]:-}" ]] || continue
+    case "$service" in
+      backend)    export BACKEND_IMAGE="${PREV_IMAGE[$service]}" ;;
+      storefront) export STOREFRONT_IMAGE="${PREV_IMAGE[$service]}" ;;
+    esac
+    any=1
+  done
+  if [[ "$any" -eq 0 ]]; then
+    printf '\033[1;31m!! No previous image was running — nothing to roll back to.\033[0m\n' >&2
+    return 1
+  fi
+  printf '\033[1;33m!! Rolling back to the previous image(s).\033[0m\n' >&2
+  compose up -d --remove-orphans $SERVICES
+  printf '\033[1;33m!! Rolled back. Migrations, if any ran this deploy, were NOT reverted — see deploy/README.md.\033[0m\n' >&2
+}
+
 step "Images"
 for service in $SERVICES; do
+  cid="$(compose ps -q "$service" 2>/dev/null || true)"
+  if [[ -n "$cid" ]]; then
+    PREV_IMAGE[$service]="$(docker inspect -f '{{.Config.Image}}' "$cid")"
+  fi
   case "$service" in
-    backend)    echo "  backend:    $BACKEND_IMAGE" ;;
-    storefront) echo "  storefront: $STOREFRONT_IMAGE" ;;
+    backend)    echo "  backend:    $BACKEND_IMAGE (was: ${PREV_IMAGE[backend]:-not running})" ;;
+    storefront) echo "  storefront: $STOREFRONT_IMAGE (was: ${PREV_IMAGE[storefront]:-not running})" ;;
   esac
 done
 
@@ -58,6 +82,9 @@ fi
 step "Starting applications"
 compose up -d --remove-orphans $SERVICES
 
+step "Starting ingress"
+compose up -d nginx cloudflared
+
 step "Waiting for healthy"
 for service in $SERVICES; do
   cid="$(compose ps -q "$service")"
@@ -67,11 +94,16 @@ for service in $SERVICES; do
     [[ "$state" == "healthy" ]] && break
     [[ "$state" == "unhealthy" ]] && {
       compose logs --tail=50 "$service"
+      rollback || true
       die "$service is unhealthy — logs above"
     }
     sleep 5
   done
-  [[ "$state" == "healthy" ]] || { compose logs --tail=50 "$service"; die "$service did not become healthy within 5 min"; }
+  if [[ "$state" != "healthy" ]]; then
+    compose logs --tail=50 "$service"
+    rollback || true
+    die "$service did not become healthy within 5 min"
+  fi
   echo "  $service: healthy"
 done
 

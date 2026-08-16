@@ -77,6 +77,15 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
         Effect   = "Allow"
         Action   = ["ssm:GetCommandInvocation", "ssm:ListCommandInvocations"]
         Resource = "*"
+      },
+      {
+        # Resolves the current instance id by tag at deploy time instead of
+        # hardcoding it in the workflow — DescribeInstances doesn't support
+        # resource-level permissions, hence Resource = "*" (read-only).
+        Sid      = "ResolveInstance"
+        Effect   = "Allow"
+        Action   = "ec2:DescribeInstances"
+        Resource = "*"
       }
     ]
   })
