@@ -24,7 +24,7 @@ needs `docker-compose.deploy.yml`.
 - a Linux **arm64** VM with Docker — the images are arm64-only. On AWS that
   means a Graviton instance; an x86 `t3` will refuse to run them with
   `exec format error`. What is actually running is a `t4g.small` (2 GB) with a
-  4 GB swapfile and the resource limits cut in `stack.env` — see §7. The VM is
+  4 GB swapfile and the resource limits cut in `stack.env` — see §8. The VM is
   created by Terraform, not by hand: [infra/README.md](../infra/README.md);
 - a Cloudflare Tunnel pointed at that VM, and two hostnames:
   `strike-shop.win` for the storefront, `api.strike-shop.win` for the backend,
@@ -209,12 +209,70 @@ there is anything worth keeping, take a `pg_dump` before rolling out.
 **Migration policy: additive-only for at least one release cycle.** `deploy.sh`
 runs migrations *before* the health check ([`deploy.sh:50-56`](deploy.sh#L50)),
 so a migration that already applied can't be un-applied if the new code then
-fails to come up healthy — `deploy.sh`'s auto-rollback (§6 above) only
-reverts the running image, never the schema. Concretely: don't drop or rename
-a column/table in the same release that stops writing to it — drop it in a
-follow-up release once nothing reads or writes the old shape anymore.
+fails to come up healthy — the auto-rollback below only reverts the running
+image, never the schema. Concretely: don't drop or rename a column/table in
+the same release that stops writing to it — drop it in a follow-up release
+once nothing reads or writes the old shape anymore.
 
-## 7. Architecture, resource limits, sizing and logs
+If a deploy's health check fails, `deploy.sh` rolls the app container(s) back
+to whatever image was running before the pull and brings them back up — no
+step needed on your end, the site should already be serving the old code
+again. What it can't undo is a migration that already applied (see above) or
+`nginx`/`cloudflared`, which it always brings up regardless of deploy outcome.
+
+## 7. Instance access & troubleshooting
+
+**Get a shell** (no SSH, no key pair — Session Manager only):
+
+```bash
+INSTANCE_ID=$(aws ec2 describe-instances --region eu-north-1 \
+  --filters "Name=tag:Name,Values=strike-shop-prod-app" "Name=instance-state-name,Values=running" \
+  --query 'Reservations[0].Instances[0].InstanceId' --output text)
+aws ssm start-session --target "$INSTANCE_ID" --region eu-north-1
+```
+
+Lands you as `ssm-user`, not in the `docker` group — every `docker`/
+`docker compose` command needs `sudo` (§2).
+
+**Quick health check:**
+
+```bash
+curl -sI https://strike-shop.win | head -1
+curl -sI https://api.strike-shop.win/health | head -1
+```
+
+On the instance, service status:
+
+```bash
+cd /opt/strike-shop
+sudo docker compose --env-file /etc/strike-shop/stack.env -f docker-compose.deploy.yml ps
+```
+
+Anything not `Up (healthy)` is where to look next.
+
+**Site is down (502 from Cloudflare):**
+1. `compose ps` — is `nginx` up? Is `backend`/`storefront` up and healthy?
+2. `compose logs --tail=100 nginx backend storefront` — nginx's error log
+   names the upstream it can't reach.
+3. A container stuck `unhealthy` or restarting: `compose logs --tail=100
+   <service>` for the actual crash, not just the health check verdict.
+4. Nothing obvious: `./deploy/deploy.sh` re-runs the current rollout —
+   idempotent, safe to retry.
+
+**A deploy just failed:** the auto-rollback (above) should have already put
+the previous image back — `compose ps` to confirm the site is serving again,
+then read the failed step's output in the GitHub Actions log before
+re-rolling out.
+
+**Admin login returns 401 right after a 200:** you're hitting
+`http://localhost:9000` instead of the domain over HTTPS — Medusa sets the
+session cookie `Secure` in production (§5).
+
+**Nothing obvious:** `compose logs --tail=200 --timestamps` across every
+service, and `docker stats --no-stream` for anything OOM-killed against the
+per-service memory budget below.
+
+## 8. Architecture, resource limits, sizing and logs
 
 Images are built for `linux/arm64` only, on GitHub's `ubuntu-24.04-arm`
 runners (free for public repos, so the build is native rather than QEMU-
@@ -269,7 +327,7 @@ Logs rotate at `50m × 3` per service — about 750 MB across the stack. The
 previous `250m × 7` allowed ~8.75 GB, which is most of a small EBS volume.
 Tunable via `LOG_MAX_SIZE` / `LOG_MAX_FILE`.
 
-## 8. Monobank
+## 9. Monobank
 
 The site runs against the **sandbox**. It differs **only in the token** —
 `MONO_API_URL` is the same
@@ -285,7 +343,7 @@ Verify after rollout by checking that the `monobank_webhook_log` table is
 filling up (it also records webhooks that failed signature verification).
 Integration details: [apps/backend/src/lib/monobank/README.md](../apps/backend/src/lib/monobank/README.md).
 
-## 9. Deliberately out of scope here
+## 10. Deliberately out of scope here
 
 - **backups** — the catalogue is seeded and reproducible, so losing the
   database costs one `seed` run. The moment there is data worth keeping: a
