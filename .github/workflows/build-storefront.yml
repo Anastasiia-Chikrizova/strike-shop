@@ -49,7 +49,7 @@ jobs:
 
       - uses: aws-actions/configure-aws-credentials@v6
         with:
-          role-to-assume: arn:aws:iam::814454905474:role/strike-shop-prod-github-deploy
+          role-to-assume: arn:aws:iam::814454905474:role/strike-shop-prod-github-build
           aws-region: eu-north-1
 
       - uses: aws-actions/amazon-ecr-login@v2
@@ -57,8 +57,10 @@ jobs:
       - uses: docker/setup-buildx-action@v4
       - name: Write storefront env to file
         id: env_file
+        env:
+          STOREFRONT_ENV: ${{ secrets.STOREFRONT_ENV }}
         run: |
-          printf '%s' "${{ secrets.STOREFRONT_ENV }}" > /tmp/storefront.env
+          printf '%s' "$STOREFRONT_ENV" > /tmp/storefront.env
           test -s /tmp/storefront.env
           echo "hash=$(sha256sum /tmp/storefront.env | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
 

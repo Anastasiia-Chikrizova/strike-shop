@@ -137,7 +137,7 @@ services:
       BACKEND_DOMAIN: ${BACKEND_DOMAIN:?set BACKEND_DOMAIN}
       STOREFRONT_DOMAIN: ${STOREFRONT_DOMAIN:?set STOREFRONT_DOMAIN}
     ports:
-      - '80:80'
+      - '127.0.0.1:80:80'
     volumes:
       - ./deploy/nginx/nginx.conf.template:/etc/nginx/templates/nginx.conf.template
       # Base image ships a default catch-all vhost on :80 — drop it so only
