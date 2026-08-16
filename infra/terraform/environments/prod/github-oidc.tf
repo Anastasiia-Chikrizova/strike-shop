@@ -13,8 +13,13 @@ data "aws_caller_identity" "current" {}
 
 locals {
   # Same trust policy for both roles — only what each role's policy grants
-  # differs. repository_id/repository_owner_id pin the repo as a second,
-  # independent factor alongside sub — GitHub doesn't put them in sub itself.
+  # differs. sub carries "@<id>" suffixes on purpose: this repo has a custom
+  # sub_claim_prefix configured (Settings → Actions → General → OIDC
+  # customization — confirmed via
+  # `gh api repos/OWNER/REPO/actions/oidc/customization/sub`), so GitHub's
+  # real tokens include them. repository_id/repository_owner_id are pinned
+  # separately as a second, independent factor — those claims don't depend
+  # on the sub customization.
   github_actions_assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
@@ -29,9 +34,9 @@ locals {
         }
         StringLike = {
           "token.actions.githubusercontent.com:sub" = [
-            "repo:Anastasiia-Chikrizova/strike-shop:ref:refs/heads/main",
-            "repo:Anastasiia-Chikrizova/strike-shop:environment:prod",
-            "repo:Anastasiia-Chikrizova/strike-shop:environment:eks",
+            "repo:Anastasiia-Chikrizova@78729920/strike-shop@1311393187:ref:refs/heads/main",
+            "repo:Anastasiia-Chikrizova@78729920/strike-shop@1311393187:environment:prod",
+            "repo:Anastasiia-Chikrizova@78729920/strike-shop@1311393187:environment:eks",
           ]
         }
       }
