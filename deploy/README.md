@@ -206,6 +206,14 @@ Migrations don't roll back — rolling back the image with an incompatible DB
 schema won't save you. Tolerable while the catalogue is seeded data; once
 there is anything worth keeping, take a `pg_dump` before rolling out.
 
+**Migration policy: additive-only for at least one release cycle.** `deploy.sh`
+runs migrations *before* the health check ([`deploy.sh:50-56`](deploy.sh#L50)),
+so a migration that already applied can't be un-applied if the new code then
+fails to come up healthy — `deploy.sh`'s auto-rollback (§6 above) only
+reverts the running image, never the schema. Concretely: don't drop or rename
+a column/table in the same release that stops writing to it — drop it in a
+follow-up release once nothing reads or writes the old shape anymore.
+
 ## 7. Architecture, resource limits, sizing and logs
 
 Images are built for `linux/arm64` only, on GitHub's `ubuntu-24.04-arm`

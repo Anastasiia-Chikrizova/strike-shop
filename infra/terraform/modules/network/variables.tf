@@ -19,6 +19,12 @@ variable "project" {
   type        = string
 }
 
+variable "tags" {
+  description = "Extra tags merged into every resource's tags, e.g. for cost allocation."
+  type        = map(string)
+  default     = {}
+}
+
 variable "subnet_cidr" {
   description = "CIDR block for the public subnet."
   type        = string

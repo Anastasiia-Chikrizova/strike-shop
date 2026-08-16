@@ -7,9 +7,9 @@ resource "aws_vpc" "main" {
   enable_dns_support   = true
   enable_dns_hostnames = true
 
-  tags = {
+  tags = merge(var.tags, {
     Name = "${local.name_prefix}-vpc"
-  }
+  })
 }
 
 resource "aws_subnet" "public" {
@@ -18,17 +18,17 @@ resource "aws_subnet" "public" {
   availability_zone       = local.availability_zone
   map_public_ip_on_launch = true
 
-  tags = {
+  tags = merge(var.tags, {
     Name = "${local.name_prefix}-public"
-  }
+  })
 }
 
 resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
 
-  tags = {
+  tags = merge(var.tags, {
     Name = "${local.name_prefix}-igw"
-  }
+  })
 }
 
 resource "aws_route_table" "public" {
@@ -39,9 +39,9 @@ resource "aws_route_table" "public" {
     gateway_id = aws_internet_gateway.main.id
   }
 
-  tags = {
+  tags = merge(var.tags, {
     Name = "${local.name_prefix}-public"
-  }
+  })
 }
 
 resource "aws_route_table_association" "public" {
@@ -54,9 +54,9 @@ resource "aws_security_group" "app" {
   description = "App instance. No ingress: SSM agent and Cloudflare Tunnel both dial out."
   vpc_id      = aws_vpc.main.id
 
-  tags = {
+  tags = merge(var.tags, {
     Name = "${local.name_prefix}-app"
-  }
+  })
 
   lifecycle {
     create_before_destroy = true
@@ -73,7 +73,7 @@ resource "aws_vpc_security_group_egress_rule" "app_all_outbound" {
 resource "aws_default_security_group" "main" {
   vpc_id = aws_vpc.main.id
 
-  tags = {
+  tags = merge(var.tags, {
     Name = "${local.name_prefix}-default-do-not-use"
-  }
+  })
 }

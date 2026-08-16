@@ -73,6 +73,12 @@ variable "ssm_parameter_prefix" {
   default     = "/strike-shop/prod"
 }
 
+variable "tags" {
+  description = "Extra tags merged into every resource's tags, e.g. for cost allocation."
+  type        = map(string)
+  default     = {}
+}
+
 variable "subnet_id" {
   description = "ID of the public subnet from the network module."
   type        = string

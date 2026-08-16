@@ -62,9 +62,9 @@ resource "aws_instance" "app" {
     http_put_response_hop_limit = 2
   }
 
-  tags = {
+  tags = merge(var.tags, {
     Name = "${local.name_prefix}-app"
-  }
+  })
 
   lifecycle {
     ignore_changes = [ami]
@@ -85,9 +85,9 @@ resource "aws_ebs_volume" "data" {
   type              = "gp3"
   encrypted         = true
 
-  tags = {
+  tags = merge(var.tags, {
     Name = "${local.name_prefix}-data"
-  }
+  })
 
   lifecycle {
     prevent_destroy = true
