@@ -30,7 +30,7 @@ AVD-AWS-0164
 
 # AWS-0031 — ECR repository tags are mutable.
 # Deliberate, not an oversight: deploy.sh and the deploy workflow rely on a
-# floating tag (`:prod`/`:eks`) that gets reassigned to the newest image on
+# floating tag (`:prod`) that gets reassigned to the newest image on
 # every push — that's how the server knows what to pull without the pipeline
 # telling it a digest. IMMUTABLE would make that specific re-tag fail outright.
 # The immutable, addressable reference already exists alongside it: every push

@@ -95,18 +95,16 @@ Then, over SSM: `sudo install -o root -g root -m 600 /tmp/x.env
 
 ## 4. GitHub
 
-Settings → Environments → **prod** and **eks**, each with a secret named
-`STOREFRONT_ENV` — the full contents of `storefront.env` as text. A push to
-`main` builds `prod`; `workflow_dispatch` takes the environment as an input
-and defaults to `eks`, so **pass `prod` explicitly** when that is what you
-want:
+Settings → Environments → **prod**, with a secret named `STOREFRONT_ENV` — the
+full contents of `storefront.env` as text. A push to `main` builds and deploys
+`prod`; `workflow_dispatch` does the same on demand:
 
 ```bash
-gh workflow run build-push.yml --ref main -f environment=prod
+gh workflow run build-push.yml --ref main
 ```
 
-The environment name is also the floating image tag (`:prod`, `:eks`)
-alongside `:${{ github.sha }}`. An empty `STOREFRONT_ENV` fails the storefront
+The environment name is also the floating image tag (`:prod`) alongside
+`:${{ github.sha }}`. An empty `STOREFRONT_ENV` fails the storefront
 job before the build even starts, at `test -s /tmp/storefront.env` — which is
 deliberate, since a bundle built without `NEXT_PUBLIC_*` is worthless, but the
 log makes it look like a Docker problem rather than a missing secret.

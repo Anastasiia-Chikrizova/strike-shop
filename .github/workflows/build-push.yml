@@ -3,14 +3,8 @@ name: build & push to ECR
 on:
   pull_request:
   push:
-    branches: [eks, main]
+    branches: [main]
   workflow_dispatch:
-    inputs:
-      environment:
-        description: Target environment
-        type: choice
-        options: [eks, prod]
-        default: eks
 
 concurrency:
   group: build-${{ github.workflow }}-${{ github.ref }}
@@ -46,7 +40,7 @@ jobs:
 
       - id: vars
         run: |
-          echo "app_env=${{ inputs.environment || (github.ref_name == 'main' && 'prod') || 'eks' }}" >> "$GITHUB_OUTPUT"
+          echo "app_env=prod" >> "$GITHUB_OUTPUT"
           echo "img_prefix=814454905474.dkr.ecr.eu-north-1.amazonaws.com/strike-shop" >> "$GITHUB_OUTPUT"
 
   backend:

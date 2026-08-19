@@ -4,8 +4,7 @@ Terraform for the AWS side of strike-shop.
 
 `environments/prod` is applied and serving traffic: one `t4g.small` behind a
 Cloudflare Tunnel at [strike-shop.win](https://strike-shop.win), admin at
-[api.strike-shop.win/app](https://api.strike-shop.win/app). `environments/eks`
-is not written yet.
+[api.strike-shop.win/app](https://api.strike-shop.win/app).
 
 Everything in this directory can still be written, validated, linted and
 security-scanned without touching AWS. See "Working without AWS" below.
@@ -14,118 +13,40 @@ security-scanned without touching AWS. See "Working without AWS" below.
 
 Account opened 2026-08-03. Credits expire 2027-08-03; the free plan itself ends
 ~2027-02-03 (6 months from signup), after which an upgrade to pay-as-you-go
-keeps the remaining credit alive. Planning horizon is 3–4 months, so neither
-deadline binds.
+keeps the remaining credit alive.
 
 | | |
 |---|---|
 | Credit available | **$200** — $100 Free Tier + 5 × $20 onboarding, all claimed |
-| Horizon | 4 months (through ~December 2026) |
-| t4g.small free trial | 750 h/month through 2026-12-31 — covers the whole window |
+| t4g.small free trial | 750 h/month through 2026-12-31 |
 
-At $200, after the always-on app takes ~$25 over four months, roughly **$175 is
-left for EKS — about 970 hours at $0.18/h.** That is 8 hours a day, every day,
-for four months.
-
-The conclusion that matters: there is no need to be stingy with the cluster.
-Destroy it when it is idle because that is the discipline being demonstrated,
-not because the credit is tight.
+The always-on app costs ~$6.99/month (see Cost below) — comfortably inside
+both the credit and the free trial.
 
 ## Layout
 
 ```
 infra/
-├── terraform/
-│   ├── bootstrap/          S3 bucket for state — applied once, state stays local
-│   ├── modules/
-│   │   ├── network/        VPC, subnet, IGW, routes, security group
-│   │   ├── app-instance/   EC2 running docker compose (always-on, cheap)
-│   │   └── eks-demo/       EKS cluster (ephemeral — apply, demo, destroy)
-│   └── environments/
-│       ├── prod/           root module: network + app-instance
-│       └── eks/            root module: network + eks-demo
-└── k8s/
-    └── helm/
-        ├── backend/        Medusa chart
-        └── storefront/     Next.js chart
+└── terraform/
+    ├── bootstrap/          S3 bucket for state — applied once, state stays local
+    ├── modules/
+    │   ├── network/        VPC, subnet, IGW, routes, security group
+    │   └── app-instance/   EC2 running docker compose (always-on, cheap)
+    └── environments/
+        └── prod/           root module: network + app-instance
 ```
 
-Two root modules, not one, and that split is the whole point: `prod` stays up
-for months at ~$6/month, `eks` exists for hours at a time. One combined state
-would make it impossible to destroy the expensive half on its own.
-
 There is no `staging`. A second always-on environment doubles the only bill
-that actually runs continuously, and buys nothing a local kind cluster does not
-already give for free. `environments/` splits by lifetime and cost here, not by
-promotion stage — `eks` is a demo stack, not a tier above `prod`.
+that actually runs continuously and buys nothing this project needs.
 
-The charts under `k8s/helm/` are deliberately outside Terraform. They are
-applied by Argo CD against whichever cluster is in front of them — kind while
-iterating, `environments/eks` when demonstrating — and nothing in them should
-need to know which.
+## Cost
 
-## The cost model this encodes
-
-| | `environments/prod` | `environments/eks` |
-|---|---|---|
-| Lifetime | months | hours |
-| Compute | t4g.small — **$0**, free trial, 750 h/month | EKS control plane $0.10/h + 2×t4g.medium $0.0688/h |
-| Cost | **$6.99/month** ($0.23/day) | $0.169/hour |
-| 4 months if left running | $28 | **$493** ← never do this |
-
-Checked on 2026-08-14 against Cost Explorer at usage-type granularity. The
-compute line is genuinely zero — `EUN1-BoxUsage:t4g.small` records real
-instance hours at $0.00 — so the monthly cost is the public IPv4 address
-($3.65) plus 40 GB of gp3 ($3.34). The trial covers `t4g.small` **only**; any
-other size, `t4g.medium` included, is billed in full, which turns $6.99/month
-into $32.10. When the trial ends, this row becomes $19.55/month.
-
-The `eks` column is on-demand list price for compute alone. It excludes the NAT
-gateway and load balancer a real cluster usually drags in, so treat $493 as a
-floor rather than an estimate.
-
-The `eks` numbers are why it is a separate root module: one combined state
-would make it impossible to tear down the expensive half on its own.
-
-Note also that EKS has no stop/start — a cluster can only be created or
-destroyed. Scaling the node group to zero on a schedule still leaves the
-control plane billing $0.10/h, which is $73/month for an idle cluster. The
-schedule that saves money is `terraform destroy`, not a scale-down.
-
-Iterate on the charts against a local kind cluster — seconds per cycle instead
-of minutes — and come to EKS once they already work. Then screenshots, then
-`terraform destroy`.
-
-## Postgres
-
-Postgres runs **in-cluster on a PVC — $0**. The managed alternative,
-`db.t4g.micro` on RDS, is ~$12/month: roughly half the entire four-month
-compute budget for a database holding a demo catalogue.
-
-In a real production system the choice inverts, and it is worth being explicit
-about why, because the reasoning is the point rather than the price:
-
-- **Backups and PITR.** RDS gives automated snapshots and point-in-time
-  recovery as configuration. In-cluster, that is a CronJob running `pg_dump` to
-  S3 — which is a backup, not a recovery *plan*, until someone has restored
-  from it at least once.
-- **Failure domain.** A PVC lives on one EBS volume attached to one node. Lose
-  the node and the database goes with it. Multi-AZ RDS survives that; here it
-  is a rebuild from the last dump.
-- **Upgrades and patching.** Minor-version patching is a checkbox on RDS and a
-  maintenance window someone has to plan in-cluster.
-- **Operational surface.** Tuning, connection limits and vacuum behaviour
-  become the cluster owner's job, and none of it is what a storefront project
-  is meant to demonstrate.
-
-What justifies in-cluster here: the data is seeded and reproducible, the
-blast radius of losing it is one `seed` command, and the cost difference is
-real money against a fixed credit budget. Those three conditions are exactly
-what stops being true in production.
-
-This is why there is no `modules/db`: the database is a Helm release under
-`k8s/helm/`, not a Terraform resource. If that ever changes, the budget table
-above changes with it.
+**$6.99/month** ($0.23/day), checked on 2026-08-14 against Cost Explorer at
+usage-type granularity. Compute is genuinely zero — `EUN1-BoxUsage:t4g.small`
+records real instance hours at $0.00 — so the monthly cost is the public IPv4
+address ($3.65) plus 40 GB of gp3 ($3.34). The trial covers `t4g.small`
+**only**; any other size is billed in full, which turns $6.99/month into
+$32.10. When the trial ends, this becomes $19.55/month.
 
 ## What goes in each module
 
@@ -155,11 +76,6 @@ is cheaper and, with no inbound rules, not less safe.
   key pair, no port 22 and no bastion.
 - `aws_eip` only if a stable address is actually needed; the auto-assigned
   public IPv4 costs the same $3.65/month either way.
-
-### `modules/eks-demo`
-- `aws_eks_cluster` + `aws_eks_node_group` (2 × `t4g.medium`, arm64 AMI type)
-- IAM roles for cluster and nodes, OIDC provider for IRSA
-- Keep it minimal. Every add-on is another thing to debug at $0.18/hour.
 
 ## Working without AWS
 
@@ -215,9 +131,6 @@ a bucket cannot be the backend for the configuration that creates it, and
 keeping it in `prod` would mean `terraform destroy` there trying to delete the
 bucket holding its own state. Four resources, recreatable by hand if the local
 state is ever lost.
-
-`environments/eks/backend.tf` is still committed commented out — fill in the
-same bucket with its own `key` when that environment gets written.
 
 Note there is no DynamoDB table. Terraform 1.11+ locks state natively through
 S3 conditional writes (`use_lockfile = true`); the `dynamodb_table` argument is

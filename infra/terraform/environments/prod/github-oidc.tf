@@ -36,7 +36,6 @@ locals {
           "token.actions.githubusercontent.com:sub" = [
             "repo:Anastasiia-Chikrizova@78729920/strike-shop@1311393187:ref:refs/heads/main",
             "repo:Anastasiia-Chikrizova@78729920/strike-shop@1311393187:environment:prod",
-            "repo:Anastasiia-Chikrizova@78729920/strike-shop@1311393187:environment:eks",
           ]
         }
       }

@@ -161,12 +161,6 @@ Actually billed so far: **$0.00.** The account carries a $200 Free Tier credit
 balance, and usage is drawn against it — $0.20 consumed at the time of writing.
 At $0.23/day the credits outlast the project by a wide margin.
 
-The number that matters is the one that is *not* in this table. A demo EKS
-cluster costs $0.10/h for the control plane alone — $73/month for something
-idle — plus nodes, plus the NAT gateway and load balancer that usually come
-with it. That is why EKS lives in a separate Terraform root module with a
-scheduled `terraform destroy`, and why it is never left running.
-
 ## Design decisions
 
 **Why no NAT gateway.** The instance sits in a *public* subnet, deliberately.
@@ -176,26 +170,20 @@ already accepts no inbound connections. The security posture comes from the
 empty security group and the outbound-only tunnel, not from subnet topology. A
 private subnet here would be a $33/month diagram decoration.
 
-**Why Postgres in the cluster, not RDS.** `db.t4g.micro` on RDS is ~$12/month —
+**Why Postgres on the instance, not RDS.** `db.t4g.micro` on RDS is ~$12/month —
 roughly double what the rest of the infrastructure costs — for a database
-holding a seeded demo catalogue. Three conditions make in-cluster defensible
-here: the data is reproducible from a seed script, the blast radius of losing
-it is one command, and the cost is real money against a fixed credit budget.
-In a real production system the choice inverts, and it is worth naming what is
-being given up: automated snapshots and point-in-time recovery (in-cluster,
-that is a `pg_dump` CronJob — a backup, not a recovery *plan*, until someone
-has restored from it once), surviving the loss of a node, and minor-version
-patching as a checkbox instead of a maintenance window someone has to plan.
-Longer version in [infra/README.md](infra/README.md#postgres).
+holding a seeded demo catalogue. Three conditions make running it in Docker
+Compose defensible here: the data is reproducible from a seed script, the
+blast radius of losing it is one command, and the cost is real money against a
+fixed credit budget. In a real production system the choice inverts, and it is
+worth naming what is being given up: automated snapshots and point-in-time
+recovery (here, that would be a cron `pg_dump` — a backup, not a recovery
+*plan*, until someone has restored from it once), surviving the loss of the
+instance without the EBS volume, and minor-version patching as a checkbox
+instead of a maintenance window someone has to plan.
 
 **Why no staging environment.** A second always-on environment doubles the only
-bill that runs continuously and buys nothing a local `kind` cluster does not
-already give for free. `environments/` in the Terraform tree splits by
-*lifetime and cost* rather than by promotion stage: `prod` stays up for months,
-`eks` exists for hours at a time and is a demo stack, not a tier above `prod`.
-The Helm charts under `k8s/helm/` are applied by Argo CD against whichever
-cluster is in front of them — kind while iterating, EKS when demonstrating —
-and nothing in them knows which.
+bill that runs continuously and buys nothing this project needs.
 
 ## Payments
 

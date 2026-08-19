@@ -15,7 +15,7 @@ See [`examples/basic`](examples/basic).
 | Name | Description | Type | Default | Required |
 | --- | --- | --- | --- | --- |
 | `project` | Project name, used in resource names. | `string` | — | yes |
-| `environment` | Environment name, used in resource names. Must be `prod` or `eks`. | `string` | — | yes |
+| `environment` | Environment name, used in resource names. Must be `prod`. | `string` | — | yes |
 | `availability_zone` | AZ for the public subnet. `null` picks the first AZ in the region. | `string` | `null` | no |
 | `subnet_cidr` | CIDR block for the public subnet. | `string` | `"10.0.1.0/24"` | no |
 | `vpc_cidr` | CIDR block for the VPC. | `string` | `"10.0.0.0/16"` | no |

@@ -17,7 +17,7 @@ See [`examples/basic`](examples/basic).
 | Name | Description | Type | Default | Required |
 | --- | --- | --- | --- | --- |
 | `project` | Project name, used in resource names. | `string` | — | yes |
-| `environment` | Environment name, used in resource names. Must be `prod` or `eks`. | `string` | — | yes |
+| `environment` | Environment name, used in resource names. Must be `prod`. | `string` | — | yes |
 | `region` | AWS region. Passed to the AWS CLI calls in `user_data`, which run before any profile or config exists on the instance. | `string` | — | yes |
 | `subnet_id` | ID of the public subnet from the network module. | `string` | — | yes |
 | `security_group_id` | ID of the security group from the network module. | `string` | — | yes |
