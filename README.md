@@ -1,13 +1,20 @@
 # strike-shop
 
+Live at **[strike-shop.win](https://strike-shop.win)** — admin at
+[api.strike-shop.win/app](https://api.strike-shop.win/app).
+
 Monorepo for the shop: a Medusa backend (`apps/backend`) and a Next.js
 storefront (`apps/storefront`). Package manager is npm, scripts run through
-turbo.
+turbo. It runs on one AWS Graviton instance in Docker Compose behind a
+Cloudflare Tunnel — [architecture](#architecture),
+[what it costs](#what-it-costs), [runbook](deploy/RUNBOOK.md).
 
 ## Running locally
 
 Requires Node.js 20+, PostgreSQL 15+, and Redis (optional — without
-`REDIS_URL` Medusa falls back to in-memory implementations).
+`REDIS_URL` Medusa falls back to in-memory implementations). If you would
+rather not install those two, `docker compose -f docker-compose.dev.yml up -d
+postgres redis` brings them up on the usual ports.
 
 1. Install dependencies:
 
@@ -57,9 +64,6 @@ it in `apps/storefront/.env.local`.
 
 ## Deployment
 
-Live at **[strike-shop.win](https://strike-shop.win)**, admin at
-[api.strike-shop.win/app](https://api.strike-shop.win/app).
-
 It runs on a single AWS Graviton instance (`t4g.small`, arm64) provisioned by
 Terraform — see [infra/README.md](infra/README.md) — with the whole stack in
 Docker Compose behind a Cloudflare Tunnel. Nothing is exposed to the internet
@@ -68,7 +72,8 @@ goes through AWS Session Manager rather than SSH.
 
 Images are built for `linux/arm64` by GitHub Actions and pushed to ECR.
 Server setup, secrets and the rollout procedure are in
-[deploy/README.md](deploy/README.md).
+[deploy/README.md](deploy/README.md); rolling out, rolling back, getting a
+shell and triaging an outage are in [deploy/RUNBOOK.md](deploy/RUNBOOK.md).
 
 ## Architecture
 

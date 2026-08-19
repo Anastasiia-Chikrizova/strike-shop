@@ -11,6 +11,7 @@ Live at [strike-shop.win](https://strike-shop.win); the API and admin at
 | [`docker-compose.deploy.yml`](../docker-compose.deploy.yml) | deploy stack: only `image:`, no `build:` |
 | [`nginx/nginx.conf.template`](nginx/nginx.conf.template) | reverse proxy on plain HTTP, split by `server_name` — TLS terminates at the Cloudflare edge |
 | [`deploy.sh`](deploy.sh) | pull → migrate → up → wait for healthy |
+| [`RUNBOOK.md`](RUNBOOK.md) | day-two operations: deploy, roll back, get a shell, triage an outage |
 | `*.env.example` | templates; the real files live in `/etc/strike-shop/` and never go into git |
 
 The `docker-compose.local.yml` in the repo root builds from source
@@ -58,7 +59,32 @@ Shell access is `aws ssm start-session` — no key pair, no port 22, no bastion.
 Note that the SSM shell lands you as `ssm-user`, who is **not** in the `docker`
 group, so every docker command there needs `sudo`.
 
-## 3. Secrets on the server
+## 3. Secrets
+
+The instance never gets its secrets by hand. The three env files live in SSM
+Parameter Store as SecureStrings under `/strike-shop/prod/` —
+`stack_env`, `backend_env`, `storefront_env` — and `user_data` fetches them at
+boot with the instance's own IAM role into `/etc/strike-shop/*.env`
+(`root:root`, `600`). That is what makes a replaced instance come up serving
+without anyone logging into it.
+
+So the files on the box are copies, and **the parameter is the source of
+truth**: change it there first, or the next instance quietly comes back with
+the old value. The put/refresh commands are in
+[RUNBOOK.md §6](RUNBOOK.md#6-changing-a-secret).
+
+Secrets are never written into `user_data` itself — user_data is readable from
+inside the instance through IMDS, so anything put there is a secret in plain
+sight.
+
+Generating them: `openssl rand -base64 32` for `JWT_SECRET`, `COOKIE_SECRET`,
+`AUTH_MFA_ENCRYPTION_KEY`. For the Postgres password use
+**`openssl rand -hex 24`**, not base64: the same value goes inside
+`DATABASE_URL`, and `+`, `/` and `=` have meaning in a URL.
+
+The templates for what goes in each file are the `deploy/*.env.example` files;
+fill a copy in locally, then push it into the parameter. On a non-AWS VM there
+is no Parameter Store, so put the filled files in `/etc/strike-shop/` yourself:
 
 ```bash
 sudo mkdir -p /etc/strike-shop
@@ -67,31 +93,14 @@ sudo cp /opt/strike-shop/deploy/*.env.example /etc/strike-shop/
 sudo chmod 600 /etc/strike-shop/*.env
 ```
 
-Generating secrets: `openssl rand -base64 32` for `JWT_SECRET`,
-`COOKIE_SECRET`, `AUTH_MFA_ENCRYPTION_KEY`. For the Postgres password use
-**`openssl rand -hex 24`**, not base64: the same value goes inside
-`DATABASE_URL`, and `+`, `/` and `=` have meaning in a URL.
-
 ECR is always private, unlike the public GHCR packages this replaced — no PAT
 or manual `docker login` to set up, though. `deploy.sh` logs in itself before
 every pull, via `aws ecr get-login-password`, using the instance's own IAM
 role (`ecr:GetAuthorizationToken` + pull rights, scoped to the two repos —
 see `infra/terraform/environments/prod/ecr.tf`).
 
-On AWS, getting the files onto the box without SSH: `scp` tunnelled through
-Session Manager, with a throwaway key that lives for 60 seconds.
-
-```bash
-aws ec2-instance-connect send-ssh-public-key --region eu-north-1 \
-  --instance-id <id> --instance-os-user ec2-user \
-  --ssh-public-key file://$HOME/.ssh/id_rsa.pub \
-&& scp -o ProxyCommand="aws ssm start-session --target %h \
-  --document-name AWS-StartSSHSession --parameters portNumber=%p \
-  --region eu-north-1" ./*.env ec2-user@<id>:/tmp/
-```
-
-Then, over SSM: `sudo install -o root -g root -m 600 /tmp/x.env
-/etc/strike-shop/x.env && shred -u /tmp/x.env`.
+Getting a file onto the box without SSH, when you do need to:
+[RUNBOOK.md §3](RUNBOOK.md#3-get-onto-the-instance).
 
 ## 4. GitHub
 
@@ -220,55 +229,12 @@ again. What it can't undo is a migration that already applied (see above) or
 
 ## 7. Instance access & troubleshooting
 
-**Get a shell** (no SSH, no key pair — Session Manager only):
-
-```bash
-INSTANCE_ID=$(aws ec2 describe-instances --region eu-north-1 \
-  --filters "Name=tag:Name,Values=strike-shop-prod-app" "Name=instance-state-name,Values=running" \
-  --query 'Reservations[0].Instances[0].InstanceId' --output text)
-aws ssm start-session --target "$INSTANCE_ID" --region eu-north-1
-```
-
-Lands you as `ssm-user`, not in the `docker` group — every `docker`/
-`docker compose` command needs `sudo` (§2).
-
-**Quick health check:**
-
-```bash
-curl -sI https://strike-shop.win | head -1
-curl -sI https://api.strike-shop.win/health | head -1
-```
-
-On the instance, service status:
-
-```bash
-cd /opt/strike-shop
-sudo docker compose --env-file /etc/strike-shop/stack.env -f docker-compose.deploy.yml ps
-```
-
-Anything not `Up (healthy)` is where to look next.
-
-**Site is down (502 from Cloudflare):**
-1. `compose ps` — is `nginx` up? Is `backend`/`storefront` up and healthy?
-2. `compose logs --tail=100 nginx backend storefront` — nginx's error log
-   names the upstream it can't reach.
-3. A container stuck `unhealthy` or restarting: `compose logs --tail=100
-   <service>` for the actual crash, not just the health check verdict.
-4. Nothing obvious: `./deploy/deploy.sh` re-runs the current rollout —
-   idempotent, safe to retry.
-
-**A deploy just failed:** the auto-rollback (above) should have already put
-the previous image back — `compose ps` to confirm the site is serving again,
-then read the failed step's output in the GitHub Actions log before
-re-rolling out.
-
-**Admin login returns 401 right after a 200:** you're hitting
-`http://localhost:9000` instead of the domain over HTTPS — Medusa sets the
-session cookie `Secure` in production (§5).
-
-**Nothing obvious:** `compose logs --tail=200 --timestamps` across every
-service, and `docker stats --no-stream` for anything OOM-killed against the
-per-service memory budget below.
+In [RUNBOOK.md](RUNBOOK.md), so that the day-two commands live in one place
+instead of drifting apart in two: getting a shell through Session Manager
+([§3](RUNBOOK.md#3-get-onto-the-instance)), the triage ladder for a site that
+is down ([§4](RUNBOOK.md#4-the-site-is-down)), the symptoms already seen once
+and what caused them ([§5](RUNBOOK.md#5-symptoms-seen-before)), and rebuilding
+the instance from nothing ([§7](RUNBOOK.md#7-rebuilding-the-instance-from-nothing)).
 
 ## 8. Architecture, resource limits, sizing and logs
 
@@ -348,12 +314,12 @@ Integration details: [apps/backend/src/lib/monobank/README.md](../apps/backend/s
   cron `pg_dump` into Cloudflare R2 (same bucket as images, or a separate
   one), plus one restore actually performed, because an untested dump is not
   a recovery plan;
-- **locking the site down from outsiders** — basic auth in nginx would break
-  the Monobank webhook, so it needs to be applied selectively, not to the
-  whole domain. Cloudflare Access on `/app` only would be the cheaper way in;
-- **secrets in SSM Parameter Store** — the `*.env` files are placed by hand
-  today, which means a recreated instance needs manual setup before it can
-  serve. See the debt list in [infra/README.ru.md](../infra/README.ru.md);
+- **rate limiting / WAF rules** — the storefront and the Monobank webhook are
+  open to the internet by necessity, and nothing throttles them. The admin
+  surface is not: Cloudflare Access sits in front of `/app` and `/admin` (all
+  four paths — with and without the trailing `/*` — in one application), so
+  automation that needs the admin API takes an Access service token rather
+  than a reopened path;
 - **a separate Medusa worker** — one instance handles both the API and
   background jobs (`MEDUSA_WORKER_MODE` defaults to `shared`). Splitting
   makes sense once there's a second machine.

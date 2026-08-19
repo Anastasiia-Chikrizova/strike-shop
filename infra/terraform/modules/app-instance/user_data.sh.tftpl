@@ -80,7 +80,7 @@ chmod 600 /etc/strike-shop/*.env
 #
 # The fallback is not laziness. deploy.sh runs with `set -e`, and Medusa's
 # db:migrate intermittently dies on a "connection timed out" that has nothing
-# to do with the database (see deploy/README.md §9). When the volume already
+# to do with the database. When the volume already
 # carries a migrated database — the normal case when an instance is replaced —
 # that failure must not leave the box half-started. The error stays in
 # /var/log/cloud-init-output.log, and if the schema really is stale the backend
