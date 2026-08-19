@@ -1,4 +1,4 @@
-name: strike-shop-${APP_ENV:?set APP_ENV=staging|prod}
+name: strike-shop-${APP_ENV:?set APP_ENV=prod}
 
 x-logging: &default-logging
   driver: ${LOG_DRIVER:-json-file}
